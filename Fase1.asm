@@ -1,4 +1,8 @@
 ; **************************INICIO DECLARACIoN DE MACROS**************************
+mLeerCaracter MACRO cadena
+    mov ah,01h    ; se carga en la parte alta el servicio 01h, que lee un caracter de la entrada y lo guarda en el registro al.
+    int 21h       ; se ejecuta el servicio cargado en ah, ejecuta 01h.
+ENDM
 mImprimirCadena MACRO cadena
     mov dx, offset cadena ; offset obtiene la direccion de cadena
     mov ah, 09h        ; se carga en la parte alta el servicio 09H, el cual despliega una cadena, que es imprimir n columnas hacia adelante.
@@ -43,8 +47,18 @@ mLeerCadenaConsola MACRO cadena
 .RADIX 10 ; Declara que el sistema númerico a utilizar será el hexadecimal (16), por default es decimal (10)
 .DATA ; Crea el segmento de datos, aquí se declaran variables...
 
-; Variable del mensaje inicial
 ;      recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
+gradoFuncion db 1 dup(0)
+coeficiente1 db 1 dup(0)
+coeficiente2 db 1 dup(0)
+coeficiente3 db 1 dup(0)
+coeficiente4 db 1 dup(0)
+coeficiente5 db 1 dup(0)
+coeficiente6 db 1 dup(0)
+preguntaCoeficiente db "Ingrese el coeficiente: ", 24h
+preguntaGrado db "Ingrese el grado de su funcion: ", 24h
+errorDigitoNoValido db "Entrada no valida ", 24h
+
 opcion1           db "Selecciono la opcion 1.", 0Ah, 24h
 opcion2           db "Selecciono la opcion 2.", 0Ah, 24h
 opcion3           db "Selecciono la opcion 3.", 0Ah, 24h
@@ -67,7 +81,8 @@ menu    db "///////////////// MENU /////////////////", 0Ah
                 db "(9) Salir de la aplicacion,", 0Ah, 24h
 
 presioneEnter   db "Presione Enter para continuar...", 0Ah, 24h
-errorMenu1       db "Opcion incorrecta, seleccione solo valores (1,2,3,4,5,6,7,8,9).", 0Ah, 24h
+errorMenu1      db "Opcion incorrecta, seleccione solo valores (1,2,3,4,5,6,7,8,9).", 0Ah, 24h
+saltoLinea      db 0Ah, 24h
 adios           db "Hasta la proximaaa!!!!", 24h
 
 
@@ -143,7 +158,7 @@ lInicio:
             call pOpcion9
             jmp lPrint1
         lOpcionIncorrecta1:
-        mImprimirCadena errorMenu1
+        mImprimirCadena errorDigitoNoValido
         mRepetirSaltoSiNoEs presioneEnter, lPrint1
         ret          ; retorna la direccion la llamada al procedimiento donde se llamo, y la asigna al registro ip, para seguir ejecutando instrucciones después de su llamada.
     pImprimirMensajeInicial endp
@@ -155,11 +170,37 @@ lInicio:
     ; Receives: --- 
     ; Returns: ---
     ;---------------------------------------------------------
+        xor ax, ax
         mLimpiarPantalla
         mImprimirCadena opcion1
-        
+        mImprimirCadena preguntaGrado
+        mLeerCaracter gradoFuncion ; guarda el caracter en 'AL'
+        cmp al, 48
+        jb lPrintError1 ; si al es más pequeño que 48
+        cmp al, 53
+        jg lPrintError1 ; si al es más grande que 53
 
-        mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion1
+        guardarGrado:
+            sub al, 48
+            mov gradoFuncion, al ; se guarda el valor del grado
+            xor ah, ah
+            xor cx, cx
+            mov cx, ax
+            ; Pedir coeficientes y guardarlos
+            lciclo1:
+                mImprimirCadena adios
+                mImprimirCadena saltoLinea
+            cmp cx, 0000
+            LOOPNE lciclo1
+
+        lPrintError1:
+            mImprimirCadena saltoLinea
+            mImprimirCadena errorDigitoNoValido
+            mImprimirCadena saltoLinea
+            mRepetirSaltoSiNoEs presioneEnter, lPrint1
+
+        lAceptarEntrada:
+            mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion1
         lSalirOpcion1:
         ret
     pOpcion1 endp
