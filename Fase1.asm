@@ -1,5 +1,5 @@
 ; **************************INICIO DECLARACIoN DE MACROS**************************
-mLeerCaracter MACRO cadena
+mLeerCaracter MACRO
     mov ah,01h    ; se carga en la parte alta el servicio 01h, que lee un caracter de la entrada y lo guarda en el registro al.
     int 21h       ; se ejecuta el servicio cargado en ah, ejecuta 01h.
 ENDM
@@ -37,7 +37,37 @@ mLeerCadenaConsola MACRO cadena
     int 21h         ; Peticion de funcion al DOS. se ejecuta el servicio cargado en ah. Ejecutar funcion 09,
     ENDM
 
+mLeerTresCaracteres MACRO cadena
+    mov bx, 00              ; Posicion inicial para capturar caracteres
+    mov cx, 0002            ; Limite de caracteres como entrada
+    mov dx, offset cadena   ; Direccion de la variable que almacena los datos de entrada
+    mov ah, 3fh             ; se carga en la parte alta el servicio 3fh, lee los datos de la consola
+    int 21h                 ; Peticion de funcion al DOS. se ejecuta el servicio cargado en ah. Ejecutar funcion 09,
+ENDM
 
+
+;---------------------------------------------------------
+mIsDigit MACRO errorNoEsDigito
+    local lContinuar, lError
+; En caso de error salta a errorNoEsDigito
+; Receives: [Al] char en el registro.
+; Returns: ZF = 1, si [Al] contiene un digito y así.
+;---------------------------------------------------------
+    cmp al,'0'
+    jb lError ; ZF = 0 when jump taken
+    cmp al,'9'
+    ja lError ; ZF = 0 when jump taken
+    jmp lContinuar
+    lError:
+        jmp errorNoEsDigito
+    lContinuar:
+        test ax,0 ; set ZF = 1, recordar que el test algo, 0; nos garantiza retornar ZF = 1    
+ENDM
+
+mLimpiarVariableByte MACRO variable
+    mov si, offset variable
+    mov word ptr[si], 0000
+ENDM
 
 ; **************************FIN DECLARACIoN DE MACROS**************************
 
@@ -48,13 +78,18 @@ mLeerCadenaConsola MACRO cadena
 .DATA ; Crea el segmento de datos, aquí se declaran variables...
 
 ;      recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
+valorBaseNumerica dw 000Ah
+numeroEntero1 dw 0, '$'
+cadEntrada db 5 dup(0), 24h
+signo db 1 dup(0) ; si es 1 es un positivo, si es 0 es un negativo
+almacenarContador db 2 dup(0)
 gradoFuncion db 1 dup(0)
-coeficiente1 db 1 dup(0)
-coeficiente2 db 1 dup(0)
-coeficiente3 db 1 dup(0)
-coeficiente4 db 1 dup(0)
-coeficiente5 db 1 dup(0)
-coeficiente6 db 1 dup(0)
+coeficiente0 dw 1 dup(0)
+coeficiente1 dw 1 dup(0)
+coeficiente2 dw 1 dup(0)
+coeficiente3 dw 1 dup(0)
+coeficiente4 dw 1 dup(0)
+coeficiente5 dw 1 dup(0)
 preguntaCoeficiente db "Ingrese el coeficiente: ", 24h
 preguntaGrado db "Ingrese el grado de su funcion: ", 24h
 errorDigitoNoValido db "Entrada no valida ", 24h
@@ -174,24 +209,175 @@ lInicio:
         mLimpiarPantalla
         mImprimirCadena opcion1
         mImprimirCadena preguntaGrado
-        mLeerCaracter gradoFuncion ; guarda el caracter en 'AL'
+        mLeerCaracter ; guarda el caracter en 'AL'
         cmp al, 48
-        jb lPrintError1 ; si al es más pequeño que 48
+        jb lPrintError2 ; si al es más pequeño que 48
         cmp al, 53
-        jg lPrintError1 ; si al es más grande que 53
+        jg lPrintError2 ; si al es más grande que 53
+        jmp guardarGrado
+        lPrintError2:
+            jmp lPrintError1
 
         guardarGrado:
             sub al, 48
             mov gradoFuncion, al ; se guarda el valor del grado
             xor ah, ah
             xor cx, cx
+            ; limpiar variable almacenarContador
+            mov si, offset almacenarContador
+            mov word ptr[si], 0000
+            ; grado de la función a contador
             mov cx, ax
+            ; inicializando coeficientes
+            mov bx, offset cadEntrada
+            call pLimpiarCadena
+            mLimpiarVariableByte coeficiente0
+            mLimpiarVariableByte coeficiente1
+            mLimpiarVariableByte coeficiente2
+            mLimpiarVariableByte coeficiente3
+            mLimpiarVariableByte coeficiente4
+            mLimpiarVariableByte coeficiente5
+            mLimpiarVariableByte signo
+            mImprimirCadena saltoLinea
+            ; di: usando para almacenar la posición en la cadena de entrada
+            ; si: puede ser volatil
+            ; ax: se usa en varios metodos
+            ; bx: volatil
             ; Pedir coeficientes y guardarlos
             lciclo1:
-                mImprimirCadena adios
+                mov bx, offset cadEntrada
+                call pLimpiarCadena 
+                mov bx, offset numeroEntero1
+                call pLimpiarCadena 
+                ; guardando registro en almacenar contador
+                mov si, offset almacenarContador
+                mov word ptr[si], cx
+                mImprimirCadena preguntaCoeficiente
+                mLeerCadenaConsola cadEntrada
+                mov di, offset cadEntrada
+                mov al, byte ptr[di]
+                ; Preguntar si es un (+) o (-)
+                cmp al, 43
+                je lEnteroPositivo1
+                cmp al, 45
+                je lEnteroNegativo1
+                mIsDigit lPrintError1 ; retorna ZF = 1 si es un digito, salta a lPrintError 1 si no lo es
+                mov bx, 0001
+                mov numeroEntero1, bx
+                FILD numeroEntero1 
+                jmp lLeerNumero
+
+                lEnteroPositivo1:
+                    mov bx, 0001
+                    mov numeroEntero1, bx
+                    FILD numeroEntero1
+                    inc di ; te desplazas en la cadena
+                    jmp lLeerNumero
+                    
+                lEnteroNegativo1:
+                    mov bx, 0001
+                    neg bx
+                    mov numeroEntero1, bx
+                    FILD numeroEntero1
+                    inc di ; te desplazas en la cadena
+                    jmp lLeerNumero
+
+                lLeerNumero:
+                    xor bx, bx
+                    xor ax, ax
+                    mov al, byte ptr[di]
+                    mIsDigit lPrintError1
+                    sub al, 30h         ; restamos 48 para que del valor del ascii ahora tengamos el valor aritmético del dígito.
+                    add bl, al
+                    inc di ; nos desplazamo en la cadena
+                    cmp byte ptr[di], 0Dh
+                    je lAceptarCoeficiente
+                    xor ax, ax
+                    mov al, byte ptr[di]
+                    mIsDigit lPrintError1
+                    sub al, 30h         ; restamos 48 para que del valor del ascii ahora tengamos el valor aritmético del dígito.
+                    xchg ax, bx                 ; esto porque en bx se almacena el valor aritmético
+                    mul valorBaseNumerica ; Ax = Ax * 10
+                    xchg ax, bx                 ; Después de realizar la mult. devolvemos todo a su lugar
+                    add bl, al
+
+                lAceptarCoeficiente:
+                    xor ax, ax
+                    mov al, bl
+                    xor bx, bx
+                    mov bx, offset numeroEntero1
+                    call pLimpiarCadena
+                    mov si, offset numeroEntero1
+                    mov byte ptr[si], al ; (+1) para que me lo guarde así 00 09 y no 09 00
+                    FILD numeroEntero1
+                    FMUL
+                    FISTP numeroEntero1     ; Extraer resultado
+                
+                lGuardarCoeficiente:
+                    xor ax, ax
+                    xor bx, bx
+                    mov si, offset almacenarContador
+                    mov ax, word ptr[si]
+                    cmp al, 5
+                    je lGuardarCoeficiente5
+                    cmp al, 4
+                    je lGuardarCoeficiente4
+                    cmp al, 3
+                    je lGuardarCoeficiente3
+                    cmp al, 2
+                    je lGuardarCoeficiente2
+                    cmp al, 1
+                    je lGuardarCoeficiente1
+                    cmp al, 0
+                    je lGuardarCoeficiente0
+
+                    lGuardarCoeficiente5:
+                        mov si, offset coeficiente5
+                        mov di, offset numeroEntero1
+                        mov ax, word ptr[di]
+                        mov word ptr[si], ax                        
+                        jmp lContinuarCiclo1
+                    lGuardarCoeficiente4:
+                        mov si, offset coeficiente4
+                        mov di, offset numeroEntero1
+                        mov ax, word ptr[di]
+                        mov word ptr[si], ax
+                        jmp lContinuarCiclo1
+                    lGuardarCoeficiente3:
+                        mov si, offset coeficiente3
+                        mov di, offset numeroEntero1
+                        mov ax, word ptr[di]
+                        mov word ptr[si], ax
+                        jmp lContinuarCiclo1
+                    lGuardarCoeficiente2:
+                        mov si, offset coeficiente2
+                        mov di, offset numeroEntero1
+                        mov ax, word ptr[di]
+                        mov word ptr[si], ax
+                        jmp lContinuarCiclo1
+                    lGuardarCoeficiente1:
+                        mov si, offset coeficiente1
+                        mov di, offset numeroEntero1
+                        mov ax, word ptr[di]
+                        mov word ptr[si], ax
+                        jmp lContinuarCiclo1
+                    lGuardarCoeficiente0:
+                        mov si, offset coeficiente0
+                        mov di, offset numeroEntero1
+                        mov ax, word ptr[di]
+                        mov word ptr[si], ax
+                        jmp lContinuarCiclo1
+
+                lContinuarCiclo1:
                 mImprimirCadena saltoLinea
+                ; extrayendo valor de almacenar contador hacia el registro
+                mov si, offset almacenarContador
+                mov cx, word ptr[si]
+            
+            dec cx
             cmp cx, 0000
-            LOOPNE lciclo1
+            jl lAceptarEntrada
+            jmp lciclo1
 
         lPrintError1:
             mImprimirCadena saltoLinea
@@ -300,6 +486,23 @@ lInicio:
         mRepetirSaltoSiNoEs presioneEnter, lSalir
         ret
     pOpcion9 endp
+
+    ;---------------------------------------------------------
+    pLimpiarCadena proc
+    ; Use: [Ah]
+    ; Receives: [Bx] variable como offset de la cadena a limpiar
+    ;---------------------------------------------------------
+
+    lLimpiarCadena:
+        mov ah, byte ptr [bx]
+        cmp ah, 24h
+        je lTerminarLimpieza
+        mov byte ptr [bx], 0
+        inc bx
+        jmp lLimpiarCadena
+    lTerminarLimpieza:
+    ret
+    pLimpiarCadena endp
 
 ;------------------------
 ; etiqueta utilizada para cerrar el programa
