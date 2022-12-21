@@ -1,4 +1,4 @@
-; **************************INICIO DECLARACIoN DE MACROS**************************
+; **************************INICIO DECLARACION DE MACROS**************************
 mLeerCaracter MACRO
     mov ah,01h    ; se carga en la parte alta el servicio 01h, que lee un caracter de la entrada y lo guarda en el registro al.
     int 21h       ; se ejecuta el servicio cargado en ah, ejecuta 01h.
@@ -8,20 +8,6 @@ mImprimirCadena MACRO cadena
     mov ah, 09h        ; se carga en la parte alta el servicio 09H, el cual despliega una cadena, que es imprimir n columnas hacia adelante.
     int 21h            ; Peticion de funcion al DOS. se ejecuta el servicio cargado en ah. Ejecutar funcion 09,
     ENDM
-
-mRepetirSaltoSiNoEs MACRO cadena, salto
-    local lRepetir
-    lRepetir:
-    mov dx, offset cadena ; offset obtiene la direccion de cadena
-    mov ah, 09h        ; se carga en la parte alta el servicio 09H, el cual despliega una cadena, que es imprimir n columnas hacia adelante.
-    int 21h            ; Peticion de funcion al DOS. se ejecuta el servicio cargado en ah. Ejecutar funcion 09,
-    mov ah,01h    ; se carga en la parte alta el servicio 01h, que lee un caracter de la entrada y lo guarda en el registro al.
-    int 21h       ; se ejecuta el servicio cargado en ah, ejecuta 01h.
-    cmp al, 0dh     ; Compara si el valor en el registro al es un Enter. al = Enter y 0dh = Enter, entonces ZF = 1, de lo contrario ZF = 0.
-    jne lRepetir  ; jne -> if ZF = 0 then jump. Si no es un Enter salta a la etiqueta lPrint1.
-    jmp salto
-    ENDM
-
 mLimpiarPantalla MACRO
     mov ah, 0Fh     ; se carga en la parte alta el servicio 0Fh, lee el modo actual de video.
     int 10h         ; Se utiliza la interrupcion 10h, esta maneja casi todos los servicios de la pantalla; Video Service.
@@ -45,7 +31,6 @@ mLeerTresCaracteres MACRO cadena
     int 21h                 ; Peticion de funcion al DOS. se ejecuta el servicio cargado en ah. Ejecutar funcion 09,
 ENDM
 
-
 ;---------------------------------------------------------
 mIsDigit MACRO errorNoEsDigito
     local lContinuar, lError
@@ -68,8 +53,31 @@ mLimpiarVariableByte MACRO variable
     mov si, offset variable
     mov word ptr[si], 0000
 ENDM
+;---------------------------------------------------------
+; imprimir el registro en variable
+; Use: [Dl]
+mImprimirValorRegistroByte MACRO variable
+;---------------------------------------------------------
+    mov ah,02h
+    mov dl, variable
+    add dl, 30h
+    int 21h
+ENDM
 
-; **************************FIN DECLARACIoN DE MACROS**************************
+mRepetirSaltoSiNoEs MACRO cadena, salto
+    local lRepetir
+    lRepetir:
+    mov dx, offset cadena ; offset obtiene la direccion de cadena
+    mov ah, 09h        ; se carga en la parte alta el servicio 09H, el cual despliega una cadena, que es imprimir n columnas hacia adelante.
+    int 21h            ; Peticion de funcion al DOS. se ejecuta el servicio cargado en ah. Ejecutar funcion 09,
+    mov ah,01h    ; se carga en la parte alta el servicio 01h, que lee un caracter de la entrada y lo guarda en el registro al.
+    int 21h       ; se ejecuta el servicio cargado en ah, ejecuta 01h.
+    cmp al, 0dh     ; Compara si el valor en el registro al es un Enter. al = Enter y 0dh = Enter, entonces ZF = 1, de lo contrario ZF = 0.
+    jne lRepetir  ; jne -> if ZF = 0 then jump. Si no es un Enter salta a la etiqueta lPrint1.
+    jmp salto
+ENDM
+
+; **************************FIN DECLARACION DE MACROS**************************
 
 ; **************************INICIO DECLARACION DE VARIABLES DEL PROGRAMA**************************
 .MODEL small ; Sirve para definir atributos del modelo de memoria
@@ -90,7 +98,14 @@ coeficiente2 dw 1 dup(0)
 coeficiente3 dw 1 dup(0)
 coeficiente4 dw 1 dup(0)
 coeficiente5 dw 1 dup(0)
-preguntaCoeficiente db "Ingrese el coeficiente: ", 24h
+suFuncionEs         db "La funcion generada es: ", 24h
+parentesisAbre      db "(", 24h
+parentesisCierra    db ")", 24h 
+signoSuma           db "+", 24h
+letraX              db "x^", 24h
+
+preguntaCoeficiente db "Ingrese el coeficiente de x^", 24h
+cierrePregunta      db ":", 24h
 preguntaGrado db "Ingrese el grado de su funcion: ", 24h
 errorDigitoNoValido db "Entrada no valida ", 24h
 
@@ -217,7 +232,6 @@ lInicio:
         jmp guardarGrado
         lPrintError2:
             jmp lPrintError1
-
         guardarGrado:
             sub al, 48
             mov gradoFuncion, al ; se guarda el valor del grado
@@ -252,8 +266,13 @@ lInicio:
                 ; guardando registro en almacenar contador
                 mov si, offset almacenarContador
                 mov word ptr[si], cx
+                
                 mImprimirCadena preguntaCoeficiente
+                mImprimirValorRegistroByte cl
+                mImprimirCadena cierrePregunta
+
                 mLeerCadenaConsola cadEntrada
+                ; Extraer el valor de una cadena a un registro
                 mov di, offset cadEntrada
                 mov al, byte ptr[di]
                 ; Preguntar si es un (+) o (-)
@@ -383,10 +402,18 @@ lInicio:
             mImprimirCadena saltoLinea
             mImprimirCadena errorDigitoNoValido
             mImprimirCadena saltoLinea
-            mRepetirSaltoSiNoEs presioneEnter, lPrint1
-
-        lAceptarEntrada:
             mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion1
+        
+        lAceptarEntrada:
+            ;Imprimir funcion
+            ;Imprimir x^5
+            mImprimirCadena parentesisAbre
+
+            mImprimirCadena parentesisCierra
+            mImprimirCadena letraX
+            mImprimirCadena 
+            mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion1
+
         lSalirOpcion1:
         ret
     pOpcion1 endp
