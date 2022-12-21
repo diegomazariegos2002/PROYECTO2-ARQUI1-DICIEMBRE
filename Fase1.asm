@@ -3,6 +3,13 @@ mLeerCaracter MACRO
     mov ah,01h    ; se carga en la parte alta el servicio 01h, que lee un caracter de la entrada y lo guarda en el registro al.
     int 21h       ; se ejecuta el servicio cargado en ah, ejecuta 01h.
 ENDM
+
+mImprimirChar MACRO char
+    mov al, char
+    mov ah, 0eh
+    int 10h
+ENDM
+
 mImprimirCadena MACRO cadena
     mov dx, offset cadena ; offset obtiene la direccion de cadena
     mov ah, 09h        ; se carga en la parte alta el servicio 09H, el cual despliega una cadena, que es imprimir n columnas hacia adelante.
@@ -77,6 +84,88 @@ mRepetirSaltoSiNoEs MACRO cadena, salto
     jmp salto
 ENDM
 
+;---------------------------------------------------------
+mIntToString MACRO salida, entrada 
+    local lUnsigned_IntWrite, lPrint_Minus, lLoopWrite, lConvDesdePila, lSalirImprimir
+; Para Escribir el número se tiene que seguir esta lógica
+; if (x < 0) {
+;     write('-');   // or just was_negative = 1
+;     x = -x;
+; }   
+; unsigned_intwrite(x)
+; Receives: 
+;   [Si] variable con el offset de una cadena que va a almacenar el resultado
+;   [Bx] variable con el entero con signo de 16 bit's 
+; Returns: ...
+; Use:  
+;   [Di] como base 10 para poder dividir
+;   [Cx] como contador de números almacenados en la pila
+;---------------------------------------------------------
+    mov bx, word ptr[entrada]
+    mov si, offset salida
+    xor cx, cx
+    xor di, di
+    cmp bx, 0
+    je lUnsigned_IntWrite ; si es cero, no imprimir (+) ni (-)
+    cmp bx, 0
+    jl lPrint_Minus ; bx < 0
+    ; Si no, Escribir más (bx > 0)
+    mov byte ptr[si], 43  
+    inc si
+    neg bx      ; -bx = +bx * -1
+    jmp lUnsigned_IntWrite
+    
+    lPrint_Minus:
+    mov byte ptr[si], 45
+    inc si
+    ; -bx = -bx
+    jmp lUnsigned_IntWrite
+
+    lUnsigned_IntWrite:
+        neg bx          ; bx = -bx * -1
+        mov ax, bx
+        mov di, 10
+        lLoopWrite:
+            xor dx, dx
+            div di      ; Como es un word entonces [Ax] = división, [Dx] = resto
+            push dx
+            inc cx      ; Incrementamos el número de elementos en la pila
+            cmp ax, 0
+            jne lLoopWrite
+        
+        lConvDesdePila:
+            pop dx
+            add dx, 48
+            mov byte ptr[si], dl
+            dec cx
+            cmp cx, 00
+            je lSalirImprimir
+            inc si
+            jmp lConvDesdePila
+
+    lSalirImprimir:
+ENDM
+
+
+;---------------------------------------------------------
+mLimpiarCadena MACRO variable
+    local lLimpiarCadena, lTerminarLimpieza
+    ; Use: [Ah]
+    ; Receives: [Bx] variable como offset de la cadena a limpiar
+    ;---------------------------------------------------------
+    mov bx, offset variable
+    lLimpiarCadena:
+        mov ah, byte ptr [bx]
+        cmp ah, 24h
+        je lTerminarLimpieza
+        mov byte ptr [bx], 0
+        inc bx
+        jmp lLimpiarCadena
+    lTerminarLimpieza:
+ENDM
+
+
+
 ; **************************FIN DECLARACION DE MACROS**************************
 
 ; **************************INICIO DECLARACION DE VARIABLES DEL PROGRAMA**************************
@@ -86,18 +175,20 @@ ENDM
 .DATA ; Crea el segmento de datos, aquí se declaran variables...
 
 ;      recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
+salidaNumeros     db 3 dup(0), 24h
 valorBaseNumerica dw 000Ah
-numeroEntero1 dw 0, '$'
+numeroEntero1 dw 0, '$'    ; almacena el menos y así.
 cadEntrada db 5 dup(0), 24h
 signo db 1 dup(0) ; si es 1 es un positivo, si es 0 es un negativo
 almacenarContador db 2 dup(0)
 gradoFuncion db 1 dup(0)
-coeficiente0 dw 1 dup(0)
-coeficiente1 dw 1 dup(0)
-coeficiente2 dw 1 dup(0)
-coeficiente3 dw 1 dup(0)
-coeficiente4 dw 1 dup(0)
-coeficiente5 dw 1 dup(0)
+; array word con salto de 3
+coeficiente0 db 2 dup(0), 24h ; Posicion 0
+coeficiente1 db 2 dup(0), 24h ; Posicion 3
+coeficiente2 db 2 dup(0), 24h ; Posicion 6
+coeficiente3 db 2 dup(0), 24h ; Posicion 9
+coeficiente4 db 2 dup(0), 24h ; Posicion 12
+coeficiente5 db 2 dup(0), 24h ; Posicion 15
 suFuncionEs         db "La funcion generada es: ", 24h
 parentesisAbre      db "(", 24h
 parentesisCierra    db ")", 24h 
@@ -243,8 +334,7 @@ lInicio:
             ; grado de la función a contador
             mov cx, ax
             ; inicializando coeficientes
-            mov bx, offset cadEntrada
-            call pLimpiarCadena
+            mLimpiarCadena cadEntrada
             mLimpiarVariableByte coeficiente0
             mLimpiarVariableByte coeficiente1
             mLimpiarVariableByte coeficiente2
@@ -259,10 +349,8 @@ lInicio:
             ; bx: volatil
             ; Pedir coeficientes y guardarlos
             lciclo1:
-                mov bx, offset cadEntrada
-                call pLimpiarCadena 
-                mov bx, offset numeroEntero1
-                call pLimpiarCadena 
+                mLimpiarCadena cadEntrada
+                mLimpiarCadena numeroEntero1
                 ; guardando registro en almacenar contador
                 mov si, offset almacenarContador
                 mov word ptr[si], cx
@@ -324,8 +412,7 @@ lInicio:
                     xor ax, ax
                     mov al, bl
                     xor bx, bx
-                    mov bx, offset numeroEntero1
-                    call pLimpiarCadena
+                    mLimpiarCadena numeroEntero1
                     mov si, offset numeroEntero1
                     mov byte ptr[si], al ; (+1) para que me lo guarde así 00 09 y no 09 00
                     FILD numeroEntero1
@@ -406,15 +493,28 @@ lInicio:
         
         lAceptarEntrada:
             ;Imprimir funcion
-            ;Imprimir x^5
-            mImprimirCadena parentesisAbre
+            ;Imprimir x^Cx
+            mov cx, 0005
+            lImprimirTermino1:
+                mImprimirChar '('
+                mLimpiarCadena salidaNumeros
+                mov si, offset coeficiente0
+                add si, 3
+                mIntToString salidaNumeros, si
+                mImprimirCadena salidaNumeros
+                mImprimirChar ')'
+                mImprimirCadena letraX
+                mImprimirChar '5'
+                
+            dec cx
+            cmp cx, 0000
+            jl lSalirOpcion1
+            jmp lImprimirTermino1
 
-            mImprimirCadena parentesisCierra
-            mImprimirCadena letraX
-            mImprimirCadena 
-            mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion1
 
         lSalirOpcion1:
+        mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion2
+        lSalirOpcion2:
         ret
     pOpcion1 endp
 
@@ -513,23 +613,6 @@ lInicio:
         mRepetirSaltoSiNoEs presioneEnter, lSalir
         ret
     pOpcion9 endp
-
-    ;---------------------------------------------------------
-    pLimpiarCadena proc
-    ; Use: [Ah]
-    ; Receives: [Bx] variable como offset de la cadena a limpiar
-    ;---------------------------------------------------------
-
-    lLimpiarCadena:
-        mov ah, byte ptr [bx]
-        cmp ah, 24h
-        je lTerminarLimpieza
-        mov byte ptr [bx], 0
-        inc bx
-        jmp lLimpiarCadena
-    lTerminarLimpieza:
-    ret
-    pLimpiarCadena endp
 
 ;------------------------
 ; etiqueta utilizada para cerrar el programa
