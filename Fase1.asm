@@ -164,6 +164,21 @@ mLimpiarCadena MACRO variable
     lTerminarLimpieza:
 ENDM
 
+mLimpiarCadenaEntero MACRO variable
+    local lLimpiarCadena, lTerminarLimpieza
+    ; Use: [Ah]
+    ; Receives: [Bx] variable como offset de la cadena a limpiar
+    ;---------------------------------------------------------
+    mov bx, offset variable
+    lLimpiarCadena:
+        mov ah, byte ptr [bx]
+        cmp ah, 24h
+        je lTerminarLimpieza
+        mov byte ptr [bx], 24h
+        inc bx
+        jmp lLimpiarCadena
+    lTerminarLimpieza:
+ENDM
 
 
 ; **************************FIN DECLARACION DE MACROS**************************
@@ -184,7 +199,7 @@ coeficiente4Derivada db 2 dup(0), 24h ; Posicion 12
 coeficiente5Derivada db 2 dup(0), 24h ; Posicion 15
 numeroEntero1 dw 0, '$'    ; almacena el menos y así.
 almacenarContador db 2 dup(0)
-salidaNumeros     db 3 dup(0), 24h
+salidaNumeros     db 6 dup('$')
 cadEntrada db 5 dup(0), 24h
 ; Variables para la funcion original
 ; array word con salto de 3
@@ -526,7 +541,7 @@ lInicio:
                 mov word ptr[si], cx
 
                 mImprimirChar '('
-                mLimpiarCadena salidaNumeros ; limpio la variable por si tiene basura
+                mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
 
                 ; Calculando la direccion del valor del array según el número de iteración
                 mov ax, cx
@@ -651,7 +666,7 @@ lInicio:
                     mov word ptr[si], cx
 
                     mImprimirChar '('
-                    mLimpiarCadena salidaNumeros ; limpio la variable por si tiene basura
+                    mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
 
                     ; Calculando la direccion del valor del array según el número de iteración
                     mov ax, cx
