@@ -189,6 +189,19 @@ ENDM
 .RADIX 10 ; Declara que el sistema númerico a utilizar será el hexadecimal (16), por default es decimal (10)
 .DATA ; Crea el segmento de datos, aquí se declaran variables...
 ; recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
+; Variables para la funcion integral
+; array word con salto de 3
+coeficiente0Integral db 2 dup(0), 24h ; Posicion 0
+coeficiente1Integral db 2 dup(0), 24h ; Posicion 3
+coeficiente2Integral db 2 dup(0), 24h ; Posicion 6
+coeficiente3Integral db 2 dup(0), 24h ; Posicion 9
+coeficiente4Integral db 2 dup(0), 24h ; Posicion 12
+coeficiente5Integral db 2 dup(0), 24h ; Posicion 15
+numeroEntero1 dw 0, '$'    ; almacena el menos y así.
+almacenarContador db 2 dup(0)
+salidaNumeros     db 6 dup('$')
+cadEntrada db 5 dup(0), 24h
+
 ; Variables para la funcion derivada
 ; array word con salto de 3
 coeficiente0Derivada db 2 dup(0), 24h ; Posicion 0
@@ -197,10 +210,7 @@ coeficiente2Derivada db 2 dup(0), 24h ; Posicion 6
 coeficiente3Derivada db 2 dup(0), 24h ; Posicion 9
 coeficiente4Derivada db 2 dup(0), 24h ; Posicion 12
 coeficiente5Derivada db 2 dup(0), 24h ; Posicion 15
-numeroEntero1 dw 0, '$'    ; almacena el menos y así.
-almacenarContador db 2 dup(0)
-salidaNumeros     db 6 dup('$')
-cadEntrada db 5 dup(0), 24h
+
 ; Variables para la funcion original
 ; array word con salto de 3
 coeficiente0 db 2 dup(0), 24h ; Posicion 0
@@ -707,11 +717,124 @@ lInicio:
     ;---------------------------------------------------------
     pOpcion4 proc
     ;
-    ; Procedimiento para la opcion 1
-    ; Receives: --- 
-    ; Returns: ---
+    ; Procedimiento para la opcion 4, imprimir la integral
+    ; Receives: todos los registros.
+    ; Returns: Salida en consola de integral.
     ;---------------------------------------------------------
-        mImprimirCadena opcion4
+        FINIT ; Inicializando FPU 
+        ; inicializando coeficientes
+        ; inicializando coeficientes
+        mLimpiarCadena cadEntrada
+        mLimpiarVariableByte coeficiente0Derivada
+        mLimpiarVariableByte coeficiente1Derivada
+        mLimpiarVariableByte coeficiente2Derivada
+        mLimpiarVariableByte coeficiente3Derivada
+        mLimpiarVariableByte coeficiente4Derivada
+        mLimpiarVariableByte coeficiente5Derivada
+        mLimpiarVariableByte signo
+        ;Generar Integral
+        ;Aplicar derivada a cada x^Cx
+        mov cx, 0004
+        lGenerarIntegral:
+            FINIT
+            ; guardando registro en almacenar contador
+            mov si, offset almacenarContador
+            mov word ptr[si], cx
+
+            ; Calculando la direccion del valor del array según el número de iteración [si]
+            mov ax, cx
+            mov bx, 0003
+            mul bx
+            mov si, offset coeficiente0
+            add si, ax
+
+            cmp word ptr[si], 0000
+            je lContinuarCiclo3
+
+            ; Calculando la direccion del valor del array según el número de iteración [di]
+            mov ax, cx
+            mov bx, 0003
+            mul bx
+            mov di, offset coeficiente0Integral
+            add di, ax
+            add di, 0003 ; pero al ser la Integral debe ser el coeficiente mayor a el coeficiente original
+
+
+            ; se tiene en [si] el coeficiente original y en el [di] el coeficiente Integral
+            mLimpiarCadena numeroEntero1
+            xor dx, dx
+            mov dx, word ptr[si]
+            mov numeroEntero1, dx
+            FILD numeroEntero1                          ; ingresa el número al FPU
+            mLimpiarCadena numeroEntero1
+            inc cx                                      ; esto porque la integral es coefieciente / (grado Actual + 1)
+            mov numeroEntero1, cx
+            dec cx                                      ; esto es para que siga el ciclo normal
+            FILD numeroEntero1                          ; ingresa el número al FPU
+            ; realizar operaciones entre los números mediante el FPU
+            FDIV
+            FISTP numeroEntero1 ; realiza la múltiplicación y la extrae del FPU y la guarda en numeroEntero
+            xor dx, dx
+            mov dx, numeroEntero1
+            mov word ptr[di], dx
+
+            lContinuarCiclo3:
+            ; extrayendo valor de almacenar contador hacia el registro
+            mov si, offset almacenarContador
+            mov cx, word ptr[si]
+        dec cx
+        cmp cx, 0000
+        jl lImprimirFuncion3
+        jmp lGenerarIntegral
+
+        lImprimirFuncion3:
+            mLimpiarPantalla
+            mImprimirCadena opcion4
+            mImprimirCadena saltoLinea
+            ;Imprimir funcion
+                ;Imprimir x^Cx
+                mov cx, 0005
+                lImprimirTermino3:
+                    ; guardando registro en almacenar contador
+                    mov si, offset almacenarContador
+                    mov word ptr[si], cx
+
+                    mImprimirChar '('
+                    mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
+
+                    ; Calculando la direccion del valor del array según el número de iteración
+                    mov ax, cx
+                    mov bx, 0003
+                    mul bx
+                    mov si, offset coeficiente0Integral
+                    add si, ax
+
+                    mIntToString salidaNumeros, si
+                    mImprimirCadena salidaNumeros
+                    
+                    ; extrayendo valor de almacenar contador hacia el registro
+                    mov si, offset almacenarContador
+                    mov cx, word ptr[si]
+                    
+                    mImprimirChar ')'
+                    mImprimirCadena letraX
+                    mImprimirValorRegistroByte cl
+                    cmp cx, 0000
+                    je lNoImprimir3
+                        mImprimirChar '+'
+                    lNoImprimir3:
+                    ; extrayendo valor de almacenar contador hacia el registro
+                    mov si, offset almacenarContador
+                    mov cx, word ptr[si]
+                dec cx
+                cmp cx, 0000
+                jl lFuncionImpresa3
+                jmp lImprimirTermino3
+
+        lFuncionImpresa3:
+        mImprimirCadena saltoLinea
+        mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion4
+        lSalirOpcion4:
         ret
     pOpcion4 endp
 
@@ -771,6 +894,17 @@ lInicio:
         mRepetirSaltoSiNoEs presioneEnter, lSalir
         ret
     pOpcion9 endp
+
+    ;---------------------------------------------------------
+    pImprimirFuncionPolinomica proc
+    ;
+    ; Procedimiento para imprimir una función polinomica.
+    ; Receives: --- 
+    ; Returns: ---
+    ;---------------------------------------------------------
+        
+        ret
+    pImprimirFuncionPolinomica endp
 
 ;------------------------
 ; etiqueta utilizada para cerrar el programa
