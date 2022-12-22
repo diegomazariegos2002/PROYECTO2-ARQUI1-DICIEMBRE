@@ -499,9 +499,10 @@ lInicio:
             mImprimirCadena errorDigitoNoValido
             mImprimirCadena saltoLinea
             mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion1
-        
+            
         lAceptarEntrada:
             call pOpcion2
+        lSalirOpcion1:
         ret
     pOpcion1 endp
 
@@ -559,8 +560,8 @@ lInicio:
 
         lFuncionImpresa1:
         mImprimirCadena saltoLinea
-        mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion1
-        lSalirOpcion1:
+        mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion2
+        lSalirOpcion2:
         ret
     pOpcion2 endp
 
@@ -622,6 +623,7 @@ lInicio:
             mov numeroEntero1, cx
             FILD numeroEntero1 ; ingresa el número al FPU
             ; realizar operaciones entre los números mediante el FPU
+            FMUL
             FISTP numeroEntero1 ; realiza la múltiplicación y la extrae del FPU y la guarda en numeroEntero
             xor dx, dx
             mov dx, numeroEntero1
@@ -633,9 +635,53 @@ lInicio:
             mov cx, word ptr[si]
         dec cx
         cmp cx, 0000
-        je lFuncionImpresa2
+        je lImprimirFuncion2
         jmp lGenerarDerivada
         
+        lImprimirFuncion2:
+            mLimpiarPantalla
+            mImprimirCadena opcion3
+            mImprimirCadena saltoLinea
+            ;Imprimir funcion
+                ;Imprimir x^Cx
+                mov cx, 0005
+                lImprimirTermino2:
+                    ; guardando registro en almacenar contador
+                    mov si, offset almacenarContador
+                    mov word ptr[si], cx
+
+                    mImprimirChar '('
+                    mLimpiarCadena salidaNumeros ; limpio la variable por si tiene basura
+
+                    ; Calculando la direccion del valor del array según el número de iteración
+                    mov ax, cx
+                    mov bx, 0003
+                    mul bx
+                    mov si, offset coeficiente0Derivada
+                    add si, ax
+
+                    mIntToString salidaNumeros, si
+                    mImprimirCadena salidaNumeros
+                    
+                    ; extrayendo valor de almacenar contador hacia el registro
+                    mov si, offset almacenarContador
+                    mov cx, word ptr[si]
+                    
+                    mImprimirChar ')'
+                    mImprimirCadena letraX
+                    mImprimirValorRegistroByte cl
+                    cmp cx, 0000
+                    je lNoImprimir2
+                        mImprimirChar '+'
+                    lNoImprimir2:
+                    ; extrayendo valor de almacenar contador hacia el registro
+                    mov si, offset almacenarContador
+                    mov cx, word ptr[si]
+                dec cx
+                cmp cx, 0000
+                jl lFuncionImpresa2
+                jmp lImprimirTermino2
+
         lFuncionImpresa2:
         mImprimirCadena saltoLinea
         mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion3
