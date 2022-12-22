@@ -189,6 +189,7 @@ ENDM
 .RADIX 10 ; Declara que el sistema númerico a utilizar será el hexadecimal (16), por default es decimal (10)
 .DATA ; Crea el segmento de datos, aquí se declaran variables...
 ; recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
+direccion1 dw ? ; Variable para almacenar direcciones
 ; Variables para la funcion integral
 ; array word con salto de 3
 coeficiente0Integral db 2 dup(0), 24h ; Posicion 0
@@ -526,7 +527,8 @@ lInicio:
             mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion1
             
         lAceptarEntrada:
-            call pOpcion2
+            call pGenerarDerivada
+            call pGenerarIntegral
         lSalirOpcion1:
         ret
     pOpcion1 endp
@@ -543,47 +545,8 @@ lInicio:
         mImprimirCadena opcion2
         mImprimirCadena saltoLinea
         ;Imprimir funcion
-            ;Imprimir x^Cx
-            mov cx, 0005
-            lImprimirTermino1:
-                ; guardando registro en almacenar contador
-                mov si, offset almacenarContador
-                mov word ptr[si], cx
-
-                mImprimirChar '('
-                mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
-
-                ; Calculando la direccion del valor del array según el número de iteración
-                mov ax, cx
-                mov bx, 0003
-                mul bx
-                mov si, offset coeficiente0
-                add si, ax
-
-                mIntToString salidaNumeros, si
-                mImprimirCadena salidaNumeros
-                
-                ; extrayendo valor de almacenar contador hacia el registro
-                mov si, offset almacenarContador
-                mov cx, word ptr[si]
-                
-                mImprimirChar ')'
-                mImprimirCadena letraX
-                mImprimirValorRegistroByte cl
-                cmp cx, 0000
-                je lNoImprimir
-                    mImprimirChar '+'
-                lNoImprimir:
-                ; extrayendo valor de almacenar contador hacia el registro
-                mov si, offset almacenarContador
-                mov cx, word ptr[si]
-            dec cx
-            cmp cx, 0000
-            jl lFuncionImpresa1
-            jmp lImprimirTermino1
-
-
-        lFuncionImpresa1:
+        mov dx, offset coeficiente0
+        call pImprimirFuncionPolinomica
         mImprimirCadena saltoLinea
         mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion2
         lSalirOpcion2:
@@ -600,114 +563,9 @@ lInicio:
         mLimpiarPantalla
         mImprimirCadena opcion3
         mImprimirCadena saltoLinea
-        FINIT ; Inicializando FPU 
-        ; inicializando coeficientes
-        mLimpiarCadena cadEntrada
-        mLimpiarVariableByte coeficiente0Derivada
-        mLimpiarVariableByte coeficiente1Derivada
-        mLimpiarVariableByte coeficiente2Derivada
-        mLimpiarVariableByte coeficiente3Derivada
-        mLimpiarVariableByte coeficiente4Derivada
-        mLimpiarVariableByte coeficiente5Derivada
-        mLimpiarVariableByte signo
-        ;Generar Derivada
-        ;Aplicar derivada a cada x^Cx
-        mov cx, 0005
-        lGenerarDerivada:
-            FINIT
-            ; guardando registro en almacenar contador
-            mov si, offset almacenarContador
-            mov word ptr[si], cx
-
-            ; Calculando la direccion del valor del array según el número de iteración [si]
-            mov ax, cx
-            mov bx, 0003
-            mul bx
-            mov si, offset coeficiente0
-            add si, ax
-
-            cmp word ptr[si], 0000
-            je lContinuarCiclo2
-
-            ; Calculando la direccion del valor del array según el número de iteración [di]
-            mov ax, cx
-            mov bx, 0003
-            mul bx
-            mov di, offset coeficiente0Derivada
-            add di, ax
-            sub di, 0003 ; pero al ser la derivada debe ser el coeficiente menor a el coeficiente original
-
-
-            ; se tiene en [si] el coeficiente original y en el [di] el coeficiente derivada
-            mLimpiarCadena numeroEntero1
-            xor dx, dx
-            mov dx, word ptr[si]
-            mov numeroEntero1, dx
-            FILD numeroEntero1 ; ingresa el número al FPU
-            mLimpiarCadena numeroEntero1
-            mov numeroEntero1, cx
-            FILD numeroEntero1 ; ingresa el número al FPU
-            ; realizar operaciones entre los números mediante el FPU
-            FMUL
-            FISTP numeroEntero1 ; realiza la múltiplicación y la extrae del FPU y la guarda en numeroEntero
-            xor dx, dx
-            mov dx, numeroEntero1
-            mov word ptr[di], dx
-
-            lContinuarCiclo2:
-            ; extrayendo valor de almacenar contador hacia el registro
-            mov si, offset almacenarContador
-            mov cx, word ptr[si]
-        dec cx
-        cmp cx, 0000
-        je lImprimirFuncion2
-        jmp lGenerarDerivada
-        
-        lImprimirFuncion2:
-            mLimpiarPantalla
-            mImprimirCadena opcion3
-            mImprimirCadena saltoLinea
-            ;Imprimir funcion
-                ;Imprimir x^Cx
-                mov cx, 0005
-                lImprimirTermino2:
-                    ; guardando registro en almacenar contador
-                    mov si, offset almacenarContador
-                    mov word ptr[si], cx
-
-                    mImprimirChar '('
-                    mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
-
-                    ; Calculando la direccion del valor del array según el número de iteración
-                    mov ax, cx
-                    mov bx, 0003
-                    mul bx
-                    mov si, offset coeficiente0Derivada
-                    add si, ax
-
-                    mIntToString salidaNumeros, si
-                    mImprimirCadena salidaNumeros
-                    
-                    ; extrayendo valor de almacenar contador hacia el registro
-                    mov si, offset almacenarContador
-                    mov cx, word ptr[si]
-                    
-                    mImprimirChar ')'
-                    mImprimirCadena letraX
-                    mImprimirValorRegistroByte cl
-                    cmp cx, 0000
-                    je lNoImprimir2
-                        mImprimirChar '+'
-                    lNoImprimir2:
-                    ; extrayendo valor de almacenar contador hacia el registro
-                    mov si, offset almacenarContador
-                    mov cx, word ptr[si]
-                dec cx
-                cmp cx, 0000
-                jl lFuncionImpresa2
-                jmp lImprimirTermino2
-
-        lFuncionImpresa2:
+        ;Imprimir funcion
+        mov dx, offset coeficiente0Derivada
+        call pImprimirFuncionPolinomica
         mImprimirCadena saltoLinea
         mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion3
         lSalirOpcion3:
@@ -721,117 +579,12 @@ lInicio:
     ; Receives: todos los registros.
     ; Returns: Salida en consola de integral.
     ;---------------------------------------------------------
-        FINIT ; Inicializando FPU 
-        ; inicializando coeficientes
-        ; inicializando coeficientes
-        mLimpiarCadena cadEntrada
-        mLimpiarVariableByte coeficiente0Derivada
-        mLimpiarVariableByte coeficiente1Derivada
-        mLimpiarVariableByte coeficiente2Derivada
-        mLimpiarVariableByte coeficiente3Derivada
-        mLimpiarVariableByte coeficiente4Derivada
-        mLimpiarVariableByte coeficiente5Derivada
-        mLimpiarVariableByte signo
-        ;Generar Integral
-        ;Aplicar derivada a cada x^Cx
-        mov cx, 0004
-        lGenerarIntegral:
-            FINIT
-            ; guardando registro en almacenar contador
-            mov si, offset almacenarContador
-            mov word ptr[si], cx
-
-            ; Calculando la direccion del valor del array según el número de iteración [si]
-            mov ax, cx
-            mov bx, 0003
-            mul bx
-            mov si, offset coeficiente0
-            add si, ax
-
-            cmp word ptr[si], 0000
-            je lContinuarCiclo3
-
-            ; Calculando la direccion del valor del array según el número de iteración [di]
-            mov ax, cx
-            mov bx, 0003
-            mul bx
-            mov di, offset coeficiente0Integral
-            add di, ax
-            add di, 0003 ; pero al ser la Integral debe ser el coeficiente mayor a el coeficiente original
-
-
-            ; se tiene en [si] el coeficiente original y en el [di] el coeficiente Integral
-            mLimpiarCadena numeroEntero1
-            xor dx, dx
-            mov dx, word ptr[si]
-            mov numeroEntero1, dx
-            FILD numeroEntero1                          ; ingresa el número al FPU
-            mLimpiarCadena numeroEntero1
-            inc cx                                      ; esto porque la integral es coefieciente / (grado Actual + 1)
-            mov numeroEntero1, cx
-            dec cx                                      ; esto es para que siga el ciclo normal
-            FILD numeroEntero1                          ; ingresa el número al FPU
-            ; realizar operaciones entre los números mediante el FPU
-            FDIV
-            FISTP numeroEntero1 ; realiza la múltiplicación y la extrae del FPU y la guarda en numeroEntero
-            xor dx, dx
-            mov dx, numeroEntero1
-            mov word ptr[di], dx
-
-            lContinuarCiclo3:
-            ; extrayendo valor de almacenar contador hacia el registro
-            mov si, offset almacenarContador
-            mov cx, word ptr[si]
-        dec cx
-        cmp cx, 0000
-        jl lImprimirFuncion3
-        jmp lGenerarIntegral
-
-        lImprimirFuncion3:
-            mLimpiarPantalla
-            mImprimirCadena opcion4
-            mImprimirCadena saltoLinea
-            ;Imprimir funcion
-                ;Imprimir x^Cx
-                mov cx, 0005
-                lImprimirTermino3:
-                    ; guardando registro en almacenar contador
-                    mov si, offset almacenarContador
-                    mov word ptr[si], cx
-
-                    mImprimirChar '('
-                    mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
-
-                    ; Calculando la direccion del valor del array según el número de iteración
-                    mov ax, cx
-                    mov bx, 0003
-                    mul bx
-                    mov si, offset coeficiente0Integral
-                    add si, ax
-
-                    mIntToString salidaNumeros, si
-                    mImprimirCadena salidaNumeros
-                    
-                    ; extrayendo valor de almacenar contador hacia el registro
-                    mov si, offset almacenarContador
-                    mov cx, word ptr[si]
-                    
-                    mImprimirChar ')'
-                    mImprimirCadena letraX
-                    mImprimirValorRegistroByte cl
-                    cmp cx, 0000
-                    je lNoImprimir3
-                        mImprimirChar '+'
-                    lNoImprimir3:
-                    ; extrayendo valor de almacenar contador hacia el registro
-                    mov si, offset almacenarContador
-                    mov cx, word ptr[si]
-                dec cx
-                cmp cx, 0000
-                jl lFuncionImpresa3
-                jmp lImprimirTermino3
-
-        lFuncionImpresa3:
+        mLimpiarPantalla
+        mImprimirCadena opcion4
+        mImprimirCadena saltoLinea
+        ;Imprimir funcion
+        mov dx, offset coeficiente0Integral
+        call pImprimirFuncionPolinomica
         mImprimirCadena saltoLinea
         mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion4
         lSalirOpcion4:
@@ -899,12 +652,221 @@ lInicio:
     pImprimirFuncionPolinomica proc
     ;
     ; Procedimiento para imprimir una función polinomica.
-    ; Receives: --- 
+    ; Hago esto en un procedimiento porque llamar macros con otras macros me realentiza a mi, mi DOSBox.
+    ; Receives: [dx] offset del array de coeficientes que tiene que ser de longitud 6 
+    ; Use:      una variable para almacenar la dirección del offset al principio
     ; Returns: ---
     ;---------------------------------------------------------
-        
+        ; Guardando la dirección de la variable parametro
+        mov si, offset direccion1
+        mov word ptr[si], dx
+        xor dx, dx
+
+        mImprimirCadena saltoLinea
+        ;Imprimir funcion
+        ;Imprimir x^Cx
+        mov cx, 0005
+            lImprimirTermino5:
+                ; guardando registro en almacenar contador
+                mov si, offset almacenarContador
+                mov word ptr[si], cx
+
+                ; Calculando la direccion del valor del array según el número de iteración
+                mov ax, cx
+                mov bx, 0003
+                mul bx
+                ; Extrayendo direccion de la variable parametro de memoria y enviandola [Si]
+                mov di, offset direccion1
+                mov si, word ptr[di]
+                add si, ax
+
+                cmp word ptr[si], 0000
+                je lContinuarCiclo5
+
+                mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
+
+                ; Calculando la direccion del valor del array según el número de iteración
+                mov ax, cx
+                mov bx, 0003
+                mul bx
+                ; Extrayendo direccion de la variable parametro de memoria y enviandola [Si]
+                mov di, offset direccion1
+                mov si, word ptr[di]
+                add si, ax
+
+                mIntToString salidaNumeros, si
+                mImprimirCadena salidaNumeros
+                
+                ; extrayendo valor de almacenar contador hacia el registro
+                mov si, offset almacenarContador
+                mov cx, word ptr[si]
+                
+                mImprimirCadena letraX
+                mImprimirValorRegistroByte cl
+
+                lContinuarCiclo5:
+                ; extrayendo valor de almacenar contador hacia el registro
+                mov si, offset almacenarContador
+                mov cx, word ptr[si]
+            dec cx
+            cmp cx, 0000
+            jl lFuncionImpresa5
+            jmp lImprimirTermino5
+
+        lFuncionImpresa5:
         ret
     pImprimirFuncionPolinomica endp
+
+    ;---------------------------------------------------------
+    pGenerarDerivada proc
+    ;
+    ; Procedimiento para generar la derivida de la funcion original
+    ; Receives: --- 
+    ; Returns: cambios en el array de los coeficientes de la derivada.
+    ;---------------------------------------------------------
+        ; Parte de generar derivada
+        FINIT ; Inicializando FPU 
+        ; inicializando coeficientes
+        mLimpiarCadena cadEntrada
+        mLimpiarVariableByte coeficiente0Derivada
+        mLimpiarVariableByte coeficiente1Derivada
+        mLimpiarVariableByte coeficiente2Derivada
+        mLimpiarVariableByte coeficiente3Derivada
+        mLimpiarVariableByte coeficiente4Derivada
+        mLimpiarVariableByte coeficiente5Derivada
+        mLimpiarVariableByte signo
+        ;Generar Derivada
+        ;Aplicar derivada a cada x^Cx
+        mov cx, 0005
+        lGenerarDerivada:
+            FINIT
+            ; guardando registro en almacenar contador
+            mov si, offset almacenarContador
+            mov word ptr[si], cx
+
+            ; Calculando la direccion del valor del array según el número de iteración [si]
+            mov ax, cx
+            mov bx, 0003
+            mul bx
+            mov si, offset coeficiente0
+            add si, ax
+
+            cmp word ptr[si], 0000
+            je lContinuarCiclo2
+
+            ; Calculando la direccion del valor del array según el número de iteración [di]
+            mov ax, cx
+            mov bx, 0003
+            mul bx
+            mov di, offset coeficiente0Derivada
+            add di, ax
+            sub di, 0003 ; pero al ser la derivada debe ser el coeficiente menor a el coeficiente original
+
+
+            ; se tiene en [si] el coeficiente original y en el [di] el coeficiente derivada
+            mLimpiarCadena numeroEntero1
+            xor dx, dx
+            mov dx, word ptr[si]
+            mov numeroEntero1, dx
+            FILD numeroEntero1 ; ingresa el número al FPU
+            mLimpiarCadena numeroEntero1
+            mov numeroEntero1, cx
+            FILD numeroEntero1 ; ingresa el número al FPU
+            ; realizar operaciones entre los números mediante el FPU
+            FMUL
+            FISTP numeroEntero1 ; realiza la múltiplicación y la extrae del FPU y la guarda en numeroEntero
+            xor dx, dx
+            mov dx, numeroEntero1
+            mov word ptr[di], dx
+
+            lContinuarCiclo2:
+            ; extrayendo valor de almacenar contador hacia el registro
+            mov si, offset almacenarContador
+            mov cx, word ptr[si]
+        dec cx
+        cmp cx, 0000
+        je lSalirProcDerivada
+        jmp lGenerarDerivada
+        
+        lSalirProcDerivada:
+        ret
+    pGenerarDerivada endp
+
+    ;---------------------------------------------------------
+    pGenerarIntegral proc
+    ;
+    ; Procedimiento para generar la integral de la funcion original
+    ; Receives: --- 
+    ; Returns: cambios en el array de los coeficientes de la integral.
+    ;---------------------------------------------------------
+        FINIT ; Inicializando FPU 
+        ; inicializando coeficientes
+        ; inicializando coeficientes
+        mLimpiarCadena cadEntrada
+        mLimpiarVariableByte coeficiente0Integral
+        mLimpiarVariableByte coeficiente1Integral
+        mLimpiarVariableByte coeficiente2Integral
+        mLimpiarVariableByte coeficiente3Integral
+        mLimpiarVariableByte coeficiente4Integral
+        mLimpiarVariableByte coeficiente5Integral
+        mLimpiarVariableByte signo
+        ;Generar Integral
+        ;Aplicar Integral a cada x^Cx
+        mov cx, 0004
+        lGenerarIntegral:
+            FINIT
+            ; guardando registro en almacenar contador
+            mov si, offset almacenarContador
+            mov word ptr[si], cx
+
+            ; Calculando la direccion del valor del array según el número de iteración [si]
+            mov ax, cx
+            mov bx, 0003
+            mul bx
+            mov si, offset coeficiente0
+            add si, ax
+
+            cmp word ptr[si], 0000
+            je lContinuarCiclo3
+
+            ; Calculando la direccion del valor del array según el número de iteración [di]
+            mov ax, cx
+            mov bx, 0003
+            mul bx
+            mov di, offset coeficiente0Integral
+            add di, ax
+            add di, 0003 ; pero al ser la Integral debe ser el coeficiente mayor a el coeficiente original
+
+
+            ; se tiene en [si] el coeficiente original y en el [di] el coeficiente Integral
+            mLimpiarCadena numeroEntero1
+            xor dx, dx
+            mov dx, word ptr[si]
+            mov numeroEntero1, dx
+            FILD numeroEntero1                          ; ingresa el número al FPU
+            mLimpiarCadena numeroEntero1
+            inc cx                                      ; esto porque la integral es coefieciente / (grado Actual + 1)
+            mov numeroEntero1, cx
+            dec cx                                      ; esto es para que siga el ciclo normal
+            FILD numeroEntero1                          ; ingresa el número al FPU
+            ; realizar operaciones entre los números mediante el FPU
+            FDIV
+            FISTP numeroEntero1 ; realiza la múltiplicación y la extrae del FPU y la guarda en numeroEntero
+            xor dx, dx
+            mov dx, numeroEntero1
+            mov word ptr[di], dx
+
+            lContinuarCiclo3:
+            ; extrayendo valor de almacenar contador hacia el registro
+            mov si, offset almacenarContador
+            mov cx, word ptr[si]
+        dec cx
+        cmp cx, 0000
+        jl lSalirProcIntegral
+        jmp lGenerarIntegral
+        lSalirProcIntegral:
+        ret
+    pGenerarIntegral endp
 
 ;------------------------
 ; etiqueta utilizada para cerrar el programa
