@@ -181,6 +181,27 @@ mLimpiarCadenaEntero MACRO variable
 ENDM
 
 
+; MACROS FASE 2
+
+mActivarModoVideo MACRO
+    push ax             ; extrayendo el valor de ax para no perderlo cuando se use la macro
+    mov ax, 0013h       ; servicio requerido 13h 
+    int 10h             
+    mov ax, 0A000h      ; Nos posicionamos en la direccion de las variables del modo vídeo
+    mov ds, ax          
+    pop ax
+ENDM
+
+mDesactivarModoVideo MACRO
+    push ax
+    mov ax, 0003h       ; servicio requerido 0003h
+    int 10h
+    mov ax, @DATA       ; retornamos a la dirección de las variables del modo texto
+    mov ds, ax
+    pop ax
+ENDM
+
+
 ; **************************FIN DECLARACION DE MACROS**************************
 
 ; **************************INICIO DECLARACION DE VARIABLES DEL PROGRAMA**************************
