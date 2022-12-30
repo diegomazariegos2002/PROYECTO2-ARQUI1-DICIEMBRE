@@ -108,6 +108,45 @@ mDibujarPixelColor macro x, y, color
     pop ax
 endm
 
+mDibujarPixelColorMejorado macro x, y, color
+    push bx
+    push ax
+    push dx
+    push cx
+    FINIT
+    mov bx, 159d ; nos posicionamos en el centro X: 159
+    ; Parte para manejar coordenada: "X"
+    mov si, offset numeroEntero1
+    mov word ptr[si], bx 
+    FILD numeroEntero1
+    mov word ptr[si], x
+    FILD numeroEntero1
+    FADD
+    FISTP numeroEntero2
+    mov bx, 100d ; nos posicionamos en el centro Y: 100
+    ; Parte para manejar coordenada: "Y"
+    mov si, offset numeroEntero1
+    mov word ptr[si], bx 
+    FILD numeroEntero1
+    mov word ptr[si], y
+    FILD numeroEntero1
+    FADD
+    FISTP numeroEntero3
+
+    mov si, offset numeroEntero2
+    mov cx, word ptr[si]            ; Coordenada X
+    mov si, offset numeroEntero3
+    mov dx, word ptr[si]            ; Coordenada Y
+    mov ah, 0Ch                     ; Servicio para pintar un pixel
+    mov al, color                   ; Color del pixel
+    int 10h             
+
+    pop cx
+    pop dx
+    pop ax
+    pop bx
+endm
+
 .MODEL small ; Sirve para definir atributos del modelo de memoria
 .STACK ; Crea el segmento de pila con valor por default
 .RADIX 10 ; Declara que el sistema númerico a utilizar será el hexadecimal, por default es decimal (10)
@@ -119,12 +158,12 @@ almacenador3 dw ? ; Variable para almacenar
 almacenador4 dw ? ; Variable para almacenar 
 ; Variables para la funcion original
 ; array word con salto de 3
-coeficiente0 db 10h, 00h , 24h ; Posicion 0
-coeficiente1 db 05h, 00h, 24h ; Posicion 3
-coeficiente2 db 02h, 00h,  24h ; Posicion 6
-coeficiente3 db 2 dup(0), 24h ; Posicion 9
-coeficiente4 db 2 dup(0), 24h ; Posicion 12
-coeficiente5 db 2 dup(0), 24h ; Posicion 15
+coeficiente0 db 01h, 00h , 24h ; Posicion 0
+coeficiente1 db 01h, 00h, 24h ; Posicion 3
+coeficiente2 db 01h, 00h,  24h ; Posicion 6
+coeficiente3 db 01h, 00h, 24h ; Posicion 9
+coeficiente4 db 01h, 00h, 24h ; Posicion 12
+coeficiente5 db 01h, 00h, 24h ; Posicion 15
 numeroEntero1 dw ?, '$'
 numeroEntero2 dw ?, '$'
 numeroEntero3 dw ?, '$'
@@ -139,9 +178,20 @@ inicio:
         mActivarModoVideo
         mDibujarEjeX
         mDibujarEjeY
-        ;mDibujarPixelColor 0001h, 0001h, 63h
+        
+        mov ah, 0Ch
+        mov al, 63h
+        mov cx, 159d ; x
+        mov dx, 100d ; y
+        int 10h
+        mov cx, 1d ; x
+        mov dx, 3d ; y
+        neg dx
+        mDibujarPixelColorMejorado cx, dx, 63h
+        
+
         ; Comienzo de método
-        ; Todas las funciones van de X: -100 a X: +100
+        ; Todas las funciones van de X: -10 a X: +10
         mov si, offset coeficiente1
         mov ax, word ptr[si]
         mov si, offset numeroEntero1
@@ -150,8 +200,10 @@ inicio:
         FIMUL numeroEntero1
         FIMUL numeroEntero1
         
-        mov di, offset coeficiente0
-        call pDibujarGrafica
+
+
+        ;mov di, offset coeficiente0
+        ;call pDibujarGrafica
         
 
         REPETIR:	
@@ -174,7 +226,7 @@ inicio:
 
     ;---------------------------------------------------------
     pDibujarGrafica PROC
-    ;
+    ; Todas las funciones van de X: -10 a X: +10
     ; Procedimiento para dibujar una funcion polinomica
     ; Receives: [di] direccion de la posicion 0 del array de coeficientes 
     ; Returns: Dibujo en pantalla.

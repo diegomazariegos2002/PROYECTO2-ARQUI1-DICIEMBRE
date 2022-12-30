@@ -188,19 +188,143 @@ mActivarModoVideo MACRO
     mov ax, 0013h       ; servicio requerido 13h 
     int 10h             
     mov ax, 0A000h      ; Nos posicionamos en la direccion de las variables del modo vídeo
-    mov ds, ax          
+    mov es, ax          
     pop ax
 ENDM
-
 mDesactivarModoVideo MACRO
     push ax
     mov ax, 0003h       ; servicio requerido 0003h
     int 10h
-    mov ax, @DATA       ; retornamos a la dirección de las variables del modo texto
-    mov ds, ax
     pop ax
 ENDM
+mDibujarEjeY macro
+LOCAL LOOP_I
+    push dx
+    push di
 
+    mov dl, 1d
+    mov di, 159d
+    LOOP_I:
+        mov es:[di], dl
+        add di, 320d         ; ubicarnos en el mismo punto solo que un nivel abajo
+        cmp di, 64000d       ; 320 * 200, límite de la pantalla
+        jb LOOP_I 
+    pop di
+    pop dx
+endm
+
+mDibujarEjeX macro
+LOCAL LOOP_I
+    push dx
+    push di
+    xor dl, dl
+    mov dl, 1d              ; color de los pixeles del eje X
+    mov di, 32000d          ; 320 * 100 
+    LOOP_I:
+        xor ax, ax
+        mov es:[di], dl
+        inc di              ; al incrementar di, nos desplazamos a la derecha
+        cmp di, 32320d      ; 320 * 101
+        jb LOOP_I 
+
+    pop di
+    pop dx
+endm
+;Ambos parametros tienen signo (x,y) y color que es el código de colores
+mDibujarPixelColor macro x, y, color
+    push ax
+    push bx
+    push di
+    push si
+    push dx
+    FINIT
+
+    xor ax, ax
+    xor bx, bx
+    xor di, di
+    xor si, si
+    xor dx, dx
+    mov ax, 32159d ; nos posicionamos en el centro Y: 320 * 100 X: +159
+    ; Parte para manejar coordenada: "X"
+    mov si, offset numeroEntero1
+    mov word ptr[si], ax 
+    FILD numeroEntero1
+
+    xor ax, ax
+    mov si, offset numeroEntero2
+    mov ax, word ptr[si]            ; valor de "X" en entero.
+    mov si, offset numeroEntero1
+    mov word ptr[si], ax 
+    FILD numeroEntero1
+    FADD                       ; desplazamiento en X
+
+    ; Parte para manejar coordenada: "Y"
+    xor ax, ax
+    mov si, offset numeroEntero3
+    mov ax, word ptr[si]            ; valor de "Y" en entero.
+    neg ax                     ; se niega para obtener la dirección correcta de subir o bajar en el plano
+    mov si, offset numeroEntero1
+    mov word ptr[si], ax
+    FILD numeroEntero1
+    xor ax, ax
+    mov ax, 320d
+    mov si, offset numeroEntero1
+    mov word ptr[si], ax
+    FILD numeroEntero1
+    FMUL                        ; total distancia en Y
+    FADD                        ; desplazamiento en Y
+    FISTP numeroEntero1
+    
+    mov si, offset numeroEntero1
+    mov di, word ptr[si]
+    mov dl, color               ; valor de COLOR del pixel
+    mov es:[di], dl
+    
+    FINIT
+    pop dx
+    pop si
+    pop di
+    pop bx
+    pop ax
+endm
+mDibujarPixelColorMejorado macro x, y, color
+    push bx
+    push ax
+    push dx
+    push cx
+    FINIT
+    mov bx, 159d ; nos posicionamos en el centro X: 159
+    ; Parte para manejar coordenada: "X"
+    mov si, offset numeroEntero1
+    mov word ptr[si], bx 
+    FILD numeroEntero1
+    mov word ptr[si], x
+    FILD numeroEntero1
+    FADD
+    FISTP numeroEntero2
+    mov bx, 100d ; nos posicionamos en el centro Y: 100
+    ; Parte para manejar coordenada: "Y"
+    mov si, offset numeroEntero1
+    mov word ptr[si], bx 
+    FILD numeroEntero1
+    mov word ptr[si], y
+    FILD numeroEntero1
+    FADD
+    FISTP numeroEntero3
+
+    mov si, offset numeroEntero2
+    mov cx, word ptr[si]            ; Coordenada X
+    mov si, offset numeroEntero3
+    mov dx, word ptr[si]            ; Coordenada Y
+    mov ah, 0Ch                     ; Servicio para pintar un pixel
+    mov al, color                   ; Color del pixel
+    int 10h             
+
+    pop cx
+    pop dx
+    pop ax
+    pop bx
+endm
 
 ; **************************FIN DECLARACION DE MACROS**************************
 
@@ -210,6 +334,14 @@ ENDM
 .RADIX 10 ; Declara que el sistema númerico a utilizar será el hexadecimal (16), por default es decimal (10)
 .DATA ; Crea el segmento de datos, aquí se declaran variables...
 ; recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
+; Variables para graficar o dibujar (como se le quiera decir)
+valorY       dw ? ; Variable para almacenar el valor de la coordenada Y.
+almacenador1 dw ? ; Variable para almacenar 
+almacenador2 dw ? ; Variable para almacenar 
+almacenador3 dw ? ; Variable para almacenar 
+almacenador4 dw ? ; Variable para almacenar 
+numeroEntero2 dw ?, '$'
+numeroEntero3 dw ?, '$'
 direccion1 dw ? ; Variable para almacenar direcciones
 ; Variables para la funcion integral
 ; array word con salto de 3
@@ -276,6 +408,11 @@ menu    db "///////////////// MENU /////////////////", 0Ah
                 db "(7) Encontrar los ceros de la funcion por medio del metodo de Newton.", 0Ah
                 db "(8) Encontrar los ceros de la funcion por medio del metodo de Steffensen.", 0Ah
                 db "(9) Salir de la aplicacion,", 0Ah, 24h
+
+subMenu    db "///////////////// SUBMENU /////////////////", 0Ah 
+           db "(1) Graficar funcion original.", 0Ah
+           db "(1) Graficar funcion derivada.", 0Ah
+           db "(1) Graficar funcion integral.", 0Ah, 24h
 
 presioneEnter   db "Presione Enter para continuar...", 0Ah, 24h
 errorMenu1      db "Opcion incorrecta, seleccione solo valores (1,2,3,4,5,6,7,8,9).", 0Ah, 24h
@@ -630,9 +767,118 @@ lInicio:
     ; Receives: --- 
     ; Returns: ---
     ;---------------------------------------------------------
+        mLimpiarPantalla
         mImprimirCadena opcion6
+        mImprimirCadena subMenu
+            mov ah,01h    ; se carga en la parte alta el servicio 01h, que lee un caracter de la entrada y lo guarda en el registro al.
+            int 21h       ; se ejecuta el servicio cargado en ah, ejecuta 01h.
+            cmp al, 49    ; Compara si el valor en el registro al es un '3'. al = 0dh, entonces ZF = 1, de lo contrario ZF = 0.
+            je  lOpcion61    ; je -> if ZF = 1 then jump. Cerrar programa
+            cmp al, 50    
+            je  lOpcion62    
+            cmp al, 51    
+            je  lOpcion63
+            jmp lOpcionIncorrecta2
+            lOpcion61:
+            call pOpcion61
+            jmp lSalirOpcion6
+            lOpcion62:
+            call pOpcion62
+            jmp lSalirOpcion6
+            lOpcion63:
+            call pOpcion63
+            jmp lSalirOpcion6
+            lOpcionIncorrecta2:
+            mImprimirCadena errorDigitoNoValido
+            mRepetirSaltoSiNoEs presioneEnter, lSalirOpcion6
+            lSalirOpcion6:
         ret
+    
     pOpcion6 endp
+    
+    ;---------------------------------------------------------
+    pOpcion61 proc 
+    ;
+    ; Procedimiento para la opcion 6.1 imprimir la función original
+    ; Receives: --- 
+    ; Returns: ---
+    ;---------------------------------------------------------
+        mLimpiarPantalla
+        mActivarModoVideo
+        mDibujarEjeX
+        mDibujarEjeY
+        mov di, offset coeficiente0
+        call pDibujarGrafica
+    
+        REPETIR:	
+        CALL TECLA
+        CMP AL,27		                ; Tecla ESC
+        JE SALIR
+        XOR CX, CX
+        XOR DX, DX
+        MOV CL, AL
+        MOV DL, AH
+        JMP REPETIR
+        SALIR:
+        mDesactivarModoVideo
+        ret
+    pOpcion61 endp
+    
+    ;---------------------------------------------------------
+    pOpcion62 proc
+    ;
+    ; Procedimiento para la opcion 6.2 imprimir la derivada
+    ; Receives: --- 
+    ; Returns: ---
+    ;---------------------------------------------------------
+        mLimpiarPantalla
+        mActivarModoVideo
+        mDibujarEjeX
+        mDibujarEjeY
+        mov di, offset coeficiente0Derivada
+        call pDibujarGrafica
+    
+        REPETIR2:	
+        CALL TECLA
+        CMP AL,27		                ; Tecla ESC
+        JE SALIR2
+        XOR CX, CX
+        XOR DX, DX
+        MOV CL, AL
+        MOV DL, AH
+        JMP REPETIR2
+        SALIR2:
+        mDesactivarModoVideo
+        ret
+    pOpcion62 endp
+
+    ;---------------------------------------------------------
+    pOpcion63 proc
+    ;
+    ; Procedimiento para la opcion 6.3 imprimir una integral
+    ; Receives: --- 
+    ; Returns: ---
+    ;---------------------------------------------------------
+        mLimpiarPantalla
+        mActivarModoVideo
+        mDibujarEjeX
+        mDibujarEjeY
+        mov di, offset coeficiente0Integral
+        call pDibujarGrafica
+    
+        REPETIR3:	
+        CALL TECLA
+        CMP AL,27		                ; Tecla ESC
+        JE SALIR3
+        XOR CX, CX
+        XOR DX, DX
+        MOV CL, AL
+        MOV DL, AH
+        JMP REPETIR3
+        SALIR3:
+        mDesactivarModoVideo
+        ret
+    pOpcion63 endp
 
     ;---------------------------------------------------------
     pOpcion7 proc
@@ -888,6 +1134,131 @@ lInicio:
         lSalirProcIntegral:
         ret
     pGenerarIntegral endp
+
+    ;---------------------------------------------------------
+    pDibujarGrafica PROC
+    ; Todas las funciones van de X: -10 a X: +10
+    ; Procedimiento para dibujar una funcion polinomica
+    ; Receives: [di] direccion de la posicion 0 del array de coeficientes 
+    ; Returns: Dibujo en pantalla.
+    ;---------------------------------------------------------
+        mov si, offset almacenador1
+        mov word ptr[si], di
+        xor si, si
+        xor di, di
+        ;Imprimir funcion en el intervalo de X: (-100, +100)
+        mov cx, -10d
+        lDibujarPuntoGrafica:
+            FINIT
+            ; guardando registro en almacenar contador
+            mov si, offset almacenador2
+            mov word ptr[si], cx
+
+            ;Calcular cada x^Cx y sumarlos, para determinar la coordenada "Y"
+            mov cx, 0005
+            lCalcularCoordenadas:
+                ; guardando registro en almacenar contador
+                mov si, offset almacenador3
+                mov word ptr[si], cx
+
+                ; Calculando la direccion del valor del array según el número de iteración
+                mov ax, cx
+                mov bx, 0003
+                mul bx
+                ; Extrayendo direccion de la variable parametro de memoria y enviandola [Si]
+                mov di, offset almacenador1
+                mov si, word ptr[di]
+                add si, ax          ; Se obtiene la posicion del array acuerdo a la iteracion del ciclo 
+
+                cmp word ptr[si], 0000 ; Si el coeficiente vale 0, saltarselo así se ahorra tiempo
+                je lContinucarCalculoCoordenadas
+
+                ; Calcular valor de C*x^n
+                ; extrayendo valor de almacenar contador hacia el registro (n)
+                mov di, offset almacenador3
+                mov cx, word ptr[di]
+                ; guardando la base (x)
+                FILD almacenador2
+
+                ; realizar parte de potencia x^n
+                lCicloPotencia:
+                cmp cx, 1d
+                je lSalirCicloPotencia
+                cmp cx, 0d
+                je lSalirPotenciaCasoCero
+                    FIMUL almacenador2
+                dec cx
+                jmp lCicloPotencia
+                lSalirPotenciaCasoCero:
+                FINIT
+                mov di, offset numeroEntero1
+                mov ax, 1d
+                mov word ptr[di], ax
+                FILD numeroEntero1
+
+                lSalirCicloPotencia:
+                ; realizar multiplicación de C * [x^n]
+                mov ax, word ptr[si]
+                mov di, offset numeroEntero1
+                mov word ptr[di], ax
+                FILD numeroEntero1
+                FMUL        ; ST(0) = resultado de multiplicación de C * [x^n]
+
+                FILD valorY ; ahora quedaría así el FPU, ST(0) = valorY, ST(1) = C*[x^n]+C[x^n-1]+...C[x^0]
+                FADD
+                FISTP valorY ; guardamos el resultado en el valor Y nuevamente.
+
+                lContinucarCalculoCoordenadas:
+                ; extrayendo valor de almacenar contador hacia el registro
+                mov si, offset almacenador3
+                mov cx, word ptr[si]
+
+                dec cx
+                cmp cx, 0000
+                jl lContinuarDibujarPuntoGrafica
+                jmp lCalcularCoordenadas
+            
+            lContinuarDibujarPuntoGrafica:
+            ; extrayendo valor de almacenar contador hacia el registro
+            mov si, offset almacenador2
+            mov cx, word ptr[si]
+            ; Dibujar punto en la grafica con las coordenadas
+            mov si, offset valorY
+            mov ax, word ptr[si]
+            ; Cx = X y Ax = Y
+
+            ; Antes de pintar validar que las coordenadas no se salgan de la pantalla, porque sino loquea
+            cmp ax, 100d
+            jge lContinuarCSP1
+            cmp ax, -100d
+            jge lSiPintar
+            lContinuarCSP1:
+            jmp lContinuarConSiguientePunto
+            
+            lSiPintar:
+            ; Cx = X y Ax = Y
+            mov dx, ax ; y -> dx = ax
+            neg dx     ; se niega para que suba de acuerdo a la coordenada la grafica
+            mDibujarPixelColorMejorado cx, dx, 63h
+
+            lContinuarConSiguientePunto:
+            ; Reiniciar coordena Y
+            mov si, offset valorY
+            mov word ptr[si], 0000h
+            inc cx
+            cmp cx, 11d
+            je lTerminarDibujo
+            jmp lDibujarPuntoGrafica
+        lTerminarDibujo:
+        ret
+    pDibujarGrafica ENDP
+
+    ; ------------------- Obtiene respuesta del teclado --------------------
+    TECLA PROC
+        MOV AH, 10H			; Petici�n entrada del teclado al BIOS
+        INT 16H				; Llama al BIOS
+        RET
+    TECLA ENDP
 
 ;------------------------
 ; etiqueta utilizada para cerrar el programa
