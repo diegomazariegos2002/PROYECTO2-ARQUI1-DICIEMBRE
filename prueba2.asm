@@ -1,3 +1,5 @@
+
+
 ; **************************INICIO DECLARACION DE VARIABLES DEL PROGRAMA**************************
 .MODEL small ; Sirve para definir atributos del modelo de memoria
 .STACK ; Crea el segmento de pila con valor por default de 1KB sino se define
@@ -8,6 +10,10 @@
 ;recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
 
 ;tablero_J1_Disparos
+;variables para imprimir decimales
+signoDecimal db 0d, '$'
+banderaFPU dw ?, '$'
+variableCero dw ?, '$'
 parteDecimal dw ?, '$'
 extraerDecimal dw 1000d, '$'
 aproximarAbajo dw 1, '$'
@@ -25,15 +31,28 @@ lInicio:
         mov ds, dx ;esto también va siempre en el main
         FINIT
         FILD numeroCualquiera
-        FILD otroCualquiera
+        FILD otroCualquiera        
         FDIV
+        FTST ; Comparar resultado con 0.0
+        FSTSW banderaFPU
+        mov si, offset banderaFPU
+        mov ax, word ptr[si]
+        TEST AH, 01h     ; Comprueba si el bit 0 (CONDITION) está establecido
+        JZ no_negativo   ; Salta a la etiqueta no_negative si el bit 0 no está establecido
+        FCHS
+        mov si, offset signoDecimal
+        mov byte ptr[si], 1d
+        no_negativo:
         FISUB aproximarAbajo
         FIST parteEntera
         FIDIV aproximarAbajo
         FILD aproximarAbajo
         FSUB
         FIMUL extraerDecimal
-        FIST parteDecimal
+        FISTP parteDecimal
+
+
+
         jmp lSalir ; terminar proceso si se llega aquí
     pMain endp
 
