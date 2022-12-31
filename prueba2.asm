@@ -11,14 +11,14 @@
 
 ;tablero_J1_Disparos
 ;variables para imprimir decimales
+aproximarAbajo dw 1, '$'
 signoDecimal db 0d, '$'
 banderaFPU dw ?, '$'
 variableCero dw ?, '$'
 parteDecimal dw ?, '$'
 extraerDecimal dw 1000d, '$'
-aproximarAbajo dw 1, '$'
-numeroCualquiera dw 8, '$'
-otroCualquiera dw 3, '$'
+numeroCualquiera dw 3, '$'
+otroCualquiera dw 4, '$'
 parteEntera dw ?
 variable dw ?
 ;**************************FIN DECLARACION DE VARIABLES DEL PROGRAMA**************************
@@ -45,14 +45,22 @@ lInicio:
         no_negativo:
         FISUB aproximarAbajo
         FIST parteEntera
-        FIDIV aproximarAbajo
+        FIADD aproximarAbajo
+        FLD ST(0)
+        FISTP aproximarAbajo
         FILD aproximarAbajo
+        FCOM
+        FSTSW banderaFPU        ; guardo las banderas del FPU en una variable
+        mov si, offset banderaFPU
+        mov ax, word ptr[si]
+        sahf ; pasa el valor del registro AH a las banderas
+        jbe lCorrectaAproximacion ; si el valor de la aproximacion es mas pequeña que el decimal
+        FLD1
+        FSUB
+        lCorrectaAproximacion:
         FSUB
         FIMUL extraerDecimal
         FISTP parteDecimal
-
-
-
         jmp lSalir ; terminar proceso si se llega aquí
     pMain endp
 

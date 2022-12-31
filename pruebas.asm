@@ -148,6 +148,68 @@ ENDM
 
 
 ;---------------------------------------------------------
+mDoubleToString MACRO salida, entrada 
+    local lUnsigned_IntWrite, lPrint_Minus, lLoopWrite, lConvDesdePila, lSalirImprimir
+; Para Escribir el número se tiene que seguir esta lógica
+; if (x < 0) {
+;     write('-');   // or just was_negative = 1
+;     x = -x;
+; }   
+; unsigned_intwrite(x)
+; Receives: 
+;   [Si] variable con el offset de una cadena que va a almacenar el resultado
+;   [Bx] variable con el entero con signo de 16 bit's 
+; Returns: ...
+; Use:  
+;   [Di] como base 10 para poder dividir
+;   [Cx] como contador de números almacenados en la pila
+;---------------------------------------------------------
+    mov bx, word ptr[entrada]
+    mov si, offset salida
+    xor cx, cx
+    xor di, di
+    cmp bx, 0
+    je lUnsigned_IntWrite ; si es cero, no imprimir (+) ni (-)
+    cmp bx, 0
+    jl lPrint_Minus ; bx < 0
+    ; Si no, Escribir más (bx > 0)
+    ;mov byte ptr[si], 43  
+    ;inc si
+    neg bx      ; -bx = +bx * -1
+    jmp lUnsigned_IntWrite
+    
+    lPrint_Minus:
+    ;mov byte ptr[si], 45
+    ;inc si
+    ; -bx = -bx
+    jmp lUnsigned_IntWrite
+
+    lUnsigned_IntWrite:
+        neg bx          ; bx = -bx * -1
+        mov ax, bx
+        mov di, 10
+        lLoopWrite:
+            xor dx, dx
+            div di      ; Como es un word entonces [Ax] = división, [Dx] = resto
+            push dx
+            inc cx      ; Incrementamos el número de elementos en la pila
+            cmp ax, 0
+            jne lLoopWrite
+        
+        lConvDesdePila:
+            pop dx
+            add dx, 48
+            mov byte ptr[si], dl
+            dec cx
+            cmp cx, 00
+            je lSalirImprimir
+            inc si
+            jmp lConvDesdePila
+
+    lSalirImprimir:
+ENDM
+
+;---------------------------------------------------------
 mLimpiarCadena MACRO variable
     local lLimpiarCadena, lTerminarLimpieza
     ; Use: [Ah]
@@ -332,6 +394,8 @@ mReiniciarVariableFPU MACRO variable
     FISTP variable
 ENDM
 
+
+
 ; **************************FIN DECLARACION DE MACROS**************************
 
 ; **************************INICIO DECLARACION DE VARIABLES DEL PROGRAMA**************************
@@ -371,7 +435,8 @@ variableValorDos dw 2d
 tope10 db '$'
 ; Variables para ver lo del resultado en decimal
 ;variables para imprimir decimales
-signoDecimal db 0d, '$'
+puntoDecimal db 46d, '$'
+signoDecimal db 43d, '$'
 banderaFPU dw ?, '$'
 variableCero dw ?, '$'
 parteDecimal dw ?, '$'
@@ -589,7 +654,7 @@ inicio:
             mov si, offset banderaFPU
             mov ax, word ptr[si]
             sahf ; pasa el valor del registro AH a las banderas
-            jbe lTerminarNewton
+            jbe lTerminarNewton ; si es menor el valor de la iteracion
             ; Caso 2 se alcanzo el valor máximo de iteraciones
             mov si, offset valorMaximoDeIteraciones
             mov cx, word ptr[si]
@@ -600,12 +665,74 @@ inicio:
 
         lTerminarNewton:
         ; Imprimir resultado
+        FINIT
+        mov si, offset valorIteracionAnterior
+        FLD valorIteracionAnterior
+        call pImprimirNumeroDecimal
+
+        
         mRepetirSaltoSiNoEs presioneEnter, lSalirProcNewton
 
         lSalirProcNewton:
         ret
     pMetodoDeNewton endp
+
+;---------------------------------------------------------
+pImprimirNumeroDecimal proc
+; Procedimiento para calcular la funcion polinomica que nosotros deseemos
+; Receives: variable en el FPU ( solo ella tiene que estar)
+; Returns: numero decimal impreso
+;---------------------------------------------------------
     
+    mov si, offset signoDecimal
+    mov byte ptr[si], 43d
+    
+    FTST ; Comparar resultado con 0.0
+    FSTSW banderaFPU
+    mov si, offset banderaFPU
+    mov ax, word ptr[si]
+    TEST AH, 01h     ; Comprueba si el bit 0 (CONDITION) está establecido
+    JZ no_negativo   ; Salta a la etiqueta no_negative si el bit 0 no está establecido
+    FCHS
+    mov si, offset signoDecimal
+    mov byte ptr[si], 45d
+    no_negativo:
+    FISUB variableValorUno
+    FIST parteEntera
+    FIADD variableValorUno
+    FLD ST(0)
+    FISTP variableValorUno
+    FCOM
+    FSTSW banderaFPU        ; guardo las banderas del FPU en una variable
+    mov si, offset banderaFPU
+    mov ax, word ptr[si]
+    sahf ; pasa el valor del registro AH a las banderas
+    jbe lCorrectaAproximacion ; si el valor de la aproximacion es mas pequeña que el decimal
+    FLD1
+    FSUB
+    lCorrectaAproximacion:
+    FSUB
+    FIMUL extraerDecimal
+    FISTP parteDecimal
+    mov si, variableValorUno
+    mov word ptr[si], 1d
+
+    mImprimirCadena signoDecimal
+
+    mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
+    mov si, offset parteEntera
+    mDoubleToString salidaNumeros, si
+    mImprimirCadena salidaNumeros
+
+    mImprimirCadena puntoDecimal
+
+    mLimpiarCadenaEntero salidaNumeros
+    mov si, offset parteDecimal
+    mDoubleToString salidaNumeros, si
+    mImprimirCadena salidaNumeros
+    ret
+pImprimirNumeroDecimal endp
+
     ;---------------------------------------------------------
     pCalcularFuncion proc
     ; Procedimiento para calcular la funcion polinomica que nosotros deseemos
