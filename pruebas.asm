@@ -394,7 +394,71 @@ mReiniciarVariableFPU MACRO variable
     FISTP variable
 ENDM
 
+;---------------------------------------------------------
+mImprimirNumeroDecimal MACRO variable
+local no_negativo, lCorrectaAproximacion
+; Macro para calcular la funcion polinomica que nosotros deseemos
+; Receives: variable en el FPU ( solo ella tiene que estar)
+; Returns: numero decimal impreso
+;---------------------------------------------------------
+    
+    mov si, offset signoDecimal
+    mov byte ptr[si], 43d
 
+    FINIT
+    mov si, offset variable
+    FLD variable
+    FTST ; Comparar resultado con 0.0
+    FSTSW banderaFPU
+    mov si, offset banderaFPU
+    mov ax, word ptr[si]
+    TEST AH, 01h     ; Comprueba si el bit 0 (CONDITION) está establecido
+    JZ no_negativo   ; Salta a la etiqueta no_negative si el bit 0 no está establecido
+    FCHS
+    mov si, offset signoDecimal
+    mov byte ptr[si], 45d
+    no_negativo:
+    FISUB variableValorUno
+    FIST parteEntera
+    FIADD variableValorUno
+    FLD ST(0)
+    FISTP variableValorUno
+    FCOM
+    FSTSW banderaFPU        ; guardo las banderas del FPU en una variable
+    mov si, offset banderaFPU
+    mov ax, word ptr[si]
+    sahf ; pasa el valor del registro AH a las banderas
+    jbe lCorrectaAproximacion ; si el valor de la aproximacion es mas pequeña que el decimal
+    ;FLD1
+    ;FSUB ; esto es para TASM al parecer porque en MASM no da problemas la aproximación del FISTP
+    lCorrectaAproximacion:
+    FSUB
+    FIMUL extraerDecimal
+    FISTP parteDecimal
+    mov si, variableValorUno
+    mov word ptr[si], 1d
+
+    mImprimirCadena signoDecimal
+
+    mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
+    mov si, offset parteEntera
+    mDoubleToString salidaNumeros, si
+    mImprimirCadena salidaNumeros
+
+    mImprimirCadena puntoDecimal
+
+    mLimpiarCadenaEntero salidaNumeros
+    mov si, offset parteDecimal
+    mDoubleToString salidaNumeros, si
+    mImprimirCadena salidaNumeros
+ENDM
+
+mImprimirEnteros MACRO variable
+    mLimpiarCadenaEntero salidaNumeros
+    mov si, offset variable
+    mIntToString salidaNumeros, si
+    mImprimirCadena salidaNumeros
+ENDM
 
 ; **************************FIN DECLARACION DE MACROS**************************
 
@@ -490,6 +554,22 @@ coeficiente5 db 0d, 0d, 24h ; Posicion 15
 signo db 1 dup(0) ; si es 1 es un positivo, si es 0 es un negativo
 gradoFuncion db 1 dup(0)
 valorBaseNumerica dw 000Ah
+
+tituloMetodoDeNewton db "////////////////////////////////// METODO DE NEWTON //////////////////////////////////", 0Ah, 24h
+elCeroEncontradoEs db "El solucion es Xn = ", 24h
+conUnErrorDe db " con un error de ", 24h
+encabezadoIteraciones db "----------------------------------", 0Ah, 24h
+iteracionTal db "Iteracion: ", 24h
+valorInicial db "Valor inicial: ", 24h
+errorIteracion db "Error iteracion: ", 24h
+errorAbsoluto db "Error buscado: ", 24h
+stringValorIteracionActual db "Valor de la iteracion actual: ", 24h
+maxIteracionesString db "el maximo de iteraciones es de: ", 24h
+stringLimiteSuperior db "Limite superior x = ", 24h
+stringLimiteInferior db "Limite inferior x = ", 24h
+
+
+
 suFuncionEs         db "La funcion generada es: ", 24h
 parentesisAbre      db "(", 24h
 parentesisCierra    db ")", 24h 
@@ -542,17 +622,7 @@ inicio:
         
         
         call pMetodoDeNewton
-
-        REPETIR:	
-
-        CALL TECLA
-        CMP AL,27		                ; Tecla ESC
-        JE SALIR
-        XOR CX, CX
-        XOR DX, DX
-        MOV CL, AL
-        MOV DL, AH
-        JMP REPETIR
+        mRepetirSaltoSiNoEs presioneEnter, SALIR
         SALIR:
 
         mov al, 16  ; retorno funcion main
@@ -566,6 +636,8 @@ inicio:
     ; Receives: Variables con los datos (variables del método de Newton)
     ; Returns: en variable parte entera y variable parte decimal, los valores correspondientes
     ;---------------------------------------------------------
+        mImprimirCadena tituloMetodoDeNewton
+        mImprimirCadena saltoLinea
         ;Lo primero que hay que hacer es calcular el error absoluto Aceptable
         ; realizar parte de potencia x^n y luego dividir 1 dentro de eso
         ; Calcular valor de cT*10^-(gT)
@@ -604,15 +676,46 @@ inicio:
         FIDIV variableValorDos ; divimos (limiteSuperior + limiteInferior) / 2 -> punto medio
         FSTP valorIteracionAnterior ; valor del punto inicial
 
+        
+
+        mImprimirCadena stringLimiteSuperior 
+        mImprimirEnteros limiteSuperior
+        mImprimirCadena saltoLinea
+        mImprimirCadena stringLimiteInferior
+        mImprimirEnteros limiteInferior
+        mImprimirCadena saltoLinea
+        mImprimirCadena valorInicial
+        FINIT
+        FLD valorIteracionAnterior
+        call pImprimirNumeroDecimal
+        mImprimirCadena saltoLinea
+        mImprimirCadena errorAbsoluto
+        mImprimirEnteros coeficienteTolerancia
+        mImprimirChar "*"
+        mImprimirChar "1"
+        mImprimirChar "0"
+        mImprimirChar "^"
+        mImprimirChar "-"
+        mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura
+        mov si, offset gradoTolerancia
+        mDoubleToString salidaNumeros, si
+        mImprimirCadena salidaNumeros
+        mImprimirCadena saltoLinea
+        mImprimirCadena maxIteracionesString
+        mImprimirEnteros valorMaximoDeIteraciones
+        
+        mImprimirCadena saltoLinea
+        mImprimirCadena saltoLinea
+
         ; guardamos el nuevo contador
         mov si, offset valorMaximoDeIteraciones
         mov cx, word ptr[si]
-        
         ; lo siguiente sería calcular ya función P_(n) = P_(n-1) - {f[P_(n-1)] / f'[P_(n-1)]}
         lFuncionNewton:
             ; guardando registro en valorMaximoDeIteraciones
             mov si, offset valorMaximoDeIteraciones
             mov word ptr[si], cx
+            
             
             ; tener en cuenta que P_(n-1) es valorIteracionAnterior
             ; Falta calcular f[P_(n-1)] / f'[P_(n-1)] 
@@ -656,6 +759,32 @@ inicio:
             sahf ; pasa el valor del registro AH a las banderas
             jbe lTerminarNewton ; si es menor el valor de la iteracion
             ; Caso 2 se alcanzo el valor máximo de iteraciones
+            
+            ; mov si, offset valorMaximoDeIteraciones
+            ; mov cx, word ptr[si]
+            ; mImprimirCadena encabezadoIteraciones
+            ; mImprimirCadena iteracionTal
+            ; mImprimirValorRegistroByte cl
+            ; mImprimirCadena saltoLinea
+
+            ; mImprimirCadena stringValorIteracionActual
+            ; FINIT
+            ; FLD valorIteracionAnterior
+            ; call pImprimirNumeroDecimal
+            ; mImprimirCadena saltoLinea
+
+            ; mImprimirCadena errorIteracion
+            ; FINIT
+            ; FLD valorErrorAbsolutoIteracion
+            ; call pImprimirNumeroDecimal
+            ; mImprimirCadena saltoLinea
+
+            ; mImprimirCadena encabezadoIteraciones
+            ; FINIT
+            ; mImprimirCadena saltoLinea
+            ; mRepetirSaltoSiNoEs presioneEnter, lContinuarNewtonEnter
+
+            ; lContinuarNewtonEnter:
             mov si, offset valorMaximoDeIteraciones
             mov cx, word ptr[si]
             dec cx
@@ -665,10 +794,15 @@ inicio:
 
         lTerminarNewton:
         ; Imprimir resultado
-        FINIT
-        mov si, offset valorIteracionAnterior
-        FLD valorIteracionAnterior
+        mImprimirCadena elCeroEncontradoEs
+        
+        FLD valorErrorAbsolutoIteracion
         call pImprimirNumeroDecimal
+        ; mImprimirCadena conUnErrorDe
+        ; FINIT
+        ; FLD valorErrorAbsolutoIteracion
+        ; call pImprimirNumeroDecimal
+        mImprimirCadena saltoLinea
 
         
         mRepetirSaltoSiNoEs presioneEnter, lSalirProcNewton
@@ -691,6 +825,8 @@ pImprimirNumeroDecimal proc
     FSTSW banderaFPU
     mov si, offset banderaFPU
     mov ax, word ptr[si]
+    sahf ; pasa el valor del registro AH a las banderas
+    je lCasoCeroFPU ; si es menor el valor de la iteracion
     TEST AH, 01h     ; Comprueba si el bit 0 (CONDITION) está establecido
     JZ no_negativo   ; Salta a la etiqueta no_negative si el bit 0 no está establecido
     FCHS
@@ -708,15 +844,20 @@ pImprimirNumeroDecimal proc
     mov ax, word ptr[si]
     sahf ; pasa el valor del registro AH a las banderas
     jbe lCorrectaAproximacion ; si el valor de la aproximacion es mas pequeña que el decimal
-    FLD1
-    FSUB
+    ;FLD1
+    ;FSUB
     lCorrectaAproximacion:
     FSUB
     FIMUL extraerDecimal
     FISTP parteDecimal
     mov si, variableValorUno
     mov word ptr[si], 1d
+    jmp lListoImprimir
+    lCasoCeroFPU:
+    mReiniciarVariableFPU parteEntera
+    mReiniciarVariableFPU parteDecimal
 
+    lListoImprimir:
     mImprimirCadena signoDecimal
 
     mLimpiarCadenaEntero salidaNumeros ; limpio la variable por si tiene basura

@@ -334,6 +334,48 @@ endm
 .RADIX 10 ; Declara que el sistema númerico a utilizar será el hexadecimal (16), por default es decimal (10)
 .DATA ; Crea el segmento de datos, aquí se declaran variables...
 ; recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
+;Variables para el metodo de Newton y Steffense
+valorMaximoDeIteraciones dw 5d
+tope13 db '$'
+coeficienteTolerancia dw 5d
+tope2 db '$'
+baseDiez dw 10d
+tope14 db '$'
+gradoTolerancia dw 3d
+tope3 db '$'
+limiteSuperior dw 1d
+tope4 db '$'
+limiteInferior dw -1d
+tope5 db '$'
+valorYFuncion dd ?
+tope8 db '$'
+valorYFuncionOriginal dd ?
+tope11 db '$'
+valorYFuncionDerivada dd ?
+tope9 db '$'
+valorIteracionAnterior dd 0d
+tope1 db '$'
+valorErrorAbsolutoIteracion dd ?
+tope12 db '$'
+valorErrorAbsolutoAceptable dd ?
+tope7 db '$'
+valorDecimalCualquiera dd ?
+tope6 db '$'
+variableValorDos dw 2d
+tope10 db '$'
+; Variables para ver lo del resultado en decimal
+;variables para imprimir decimales
+puntoDecimal db 46d, '$'
+signoDecimal db 43d, '$'
+banderaFPU dw ?, '$'
+variableCero dw ?, '$'
+parteDecimal dw ?, '$'
+extraerDecimal dw 1000d, '$'
+variableValorUno dw 1, '$'
+numeroCualquiera dw 8, '$'
+otroCualquiera dw 3, '$'
+parteEntera dw ?
+variable dw ?
 ; Variables para graficar o dibujar (como se le quiera decir)
 valorY       dw ? ; Variable para almacenar el valor de la coordenada Y.
 almacenador1 dw ? ; Variable para almacenar 
@@ -374,9 +416,17 @@ coeficiente3 db 2 dup(0), 24h ; Posicion 9
 coeficiente4 db 2 dup(0), 24h ; Posicion 12
 coeficiente5 db 2 dup(0), 24h ; Posicion 15
 
+
 signo db 1 dup(0) ; si es 1 es un positivo, si es 0 es un negativo
 gradoFuncion db 1 dup(0)
 valorBaseNumerica dw 000Ah
+
+preguntaIteracionesMaximos db "Ingresar numero de iteraciones maximo: ", 24h
+preguntaCoeficienteTolerancia db "Ingresar el coeficiente de tolerancia: ", 24h
+preguntaGradoTolerancia db "Ingresar el grado de tolerancia: ", 24h
+preguntarLimiteSuperior db "Ingresar el limite Superior: ", 24h
+preguntarLimiteInferior db "Ingresar el limite Inferior: ", 24h
+
 suFuncionEs         db "La funcion generada es: ", 24h
 parentesisAbre      db "(", 24h
 parentesisCierra    db ")", 24h 
@@ -411,8 +461,8 @@ menu    db "///////////////// MENU /////////////////", 0Ah
 
 subMenu    db "///////////////// SUBMENU /////////////////", 0Ah 
            db "(1) Graficar funcion original.", 0Ah
-           db "(1) Graficar funcion derivada.", 0Ah
-           db "(1) Graficar funcion integral.", 0Ah, 24h
+           db "(2) Graficar funcion derivada.", 0Ah
+           db "(3) Graficar funcion integral.", 0Ah, 24h
 
 presioneEnter   db "Presione Enter para continuar...", 0Ah, 24h
 errorMenu1      db "Opcion incorrecta, seleccione solo valores (1,2,3,4,5,6,7,8,9).", 0Ah, 24h
@@ -883,11 +933,14 @@ lInicio:
     ;---------------------------------------------------------
     pOpcion7 proc
     ;
-    ; Procedimiento para la opcion 1
+    ; Procedimiento para la opcion 7, encontrar los ceros por medio del método de Newton
     ; Receives: --- 
     ; Returns: ---
     ;---------------------------------------------------------
         mImprimirCadena opcion7
+        mImprimirCadena preguntaIteracionesMaximos
+
+        
         ret
     pOpcion7 endp
 
@@ -914,6 +967,76 @@ lInicio:
         mRepetirSaltoSiNoEs presioneEnter, lSalir
         ret
     pOpcion9 endp
+
+    pLeerNumeroEnteroEntrada proc
+    ;
+    ; Procedimiento para recibir un numero entero en la entrada
+    ; Receives: [si] offset de la variable donde se va a guardar el resultado
+    ; Returns: ---
+    ;---------------------------------------------------------
+        push si
+        mLeerCadenaConsola cadEntrada
+        ; Extraer el valor de una cadena a un registro
+        mov di, offset cadEntrada
+        mov al, byte ptr[di]
+        ; Preguntar si es un (+) o (-)
+        cmp al, 43
+        je lEnteroPositivo3
+        cmp al, 45
+        je lEnteroNegativo3
+        mIsDigit lPrintError3 ; retorna ZF = 1 si es un digito, salta a lPrintError 1 si no lo es
+        mov bx, 0001
+        mov numeroEntero1, bx
+        FILD numeroEntero1 
+        jmp lLeerNumero3
+
+        lEnteroPositivo3:
+            mov bx, 0001
+            mov numeroEntero1, bx
+            FILD numeroEntero1
+            inc di ; te desplazas en la cadena
+            jmp lLeerNumero3
+            
+        lEnteroNegativo3:
+            mov bx, 0001
+            neg bx
+            mov numeroEntero1, bx
+            FILD numeroEntero1
+            inc di ; te desplazas en la cadena
+            jmp lLeerNumero3
+
+        lLeerNumero3:
+            xor bx, bx
+            xor ax, ax
+            mov al, byte ptr[di]
+            mIsDigit lPrintError3
+            sub al, 30h         ; restamos 48 para que del valor del ascii ahora tengamos el valor aritmético del dígito.
+            add bl, al
+            inc di ; nos desplazamo en la cadena
+            cmp byte ptr[di], 0Dh
+            je lAceptarCoeficiente3
+            xor ax, ax
+            mov al, byte ptr[di]
+            mIsDigit lPrintError3
+            sub al, 30h         ; restamos 48 para que del valor del ascii ahora tengamos el valor aritmético del dígito.
+            xchg ax, bx                 ; esto porque en bx se almacena el valor aritmético
+            mul valorBaseNumerica ; Ax = Ax * 10
+            xchg ax, bx                 ; Después de realizar la mult. devolvemos todo a su lugar
+            add bl, al
+
+        lAceptarCoeficiente3:
+            xor ax, ax
+            mov al, bl
+            xor bx, bx
+            mLimpiarCadena numeroEntero1
+            mov si, offset numeroEntero1
+            mov byte ptr[si], al ; (+1) para que me lo guarde así 00 09 y no 09 00
+            FILD numeroEntero1
+            FMUL
+            FISTP numeroEntero1     ; Extraer resultado
+            lPrintError3:
+        ret
+    pLeerNumeroEnteroEntrada endp
 
     ;---------------------------------------------------------
     pImprimirFuncionPolinomica proc
