@@ -468,6 +468,20 @@ ENDM
 .RADIX 10 ; Declara que el sistema númerico a utilizar será el hexadecimal (16), por default es decimal (10)
 .DATA ; Crea el segmento de datos, aquí se declaran variables...
 ; recordar que el db es 'Define Byte' y define un variable de 8-bit en memoria.
+; Variables para ver lo del resultado en decimal
+;variables para imprimir decimales
+puntoDecimal db 46d, '$'
+signoDecimal db 43d, '$'
+banderaFPU dw ?, '$'
+variableCero dw ?, '$'
+parteDecimal dw ?, '$'
+extraerDecimal dw 1000d, '$'
+variableValorUno dw 1d, '$'
+numeroCualquiera dw 8, '$'
+otroCualquiera dw 3, '$'
+parteEntera dw ?
+variable dw ?
+
 ;Variables para el metodo de Newton y Steffense
 valorMaximoDeIteraciones dw 5d
 tope13 db '$'
@@ -481,35 +495,25 @@ limiteSuperior dw 1d
 tope4 db '$'
 limiteInferior dw -1d
 tope5 db '$'
-valorYFuncion dd ?
+valorYFuncion dq ?
 tope8 db '$'
-valorYFuncionOriginal dd ?
+valorYFuncionOriginal dq ?
 tope11 db '$'
-valorYFuncionDerivada dd ?
+valorYFuncionDerivada dq ?
 tope9 db '$'
-valorIteracionAnterior dd 0d
+valorIteracionAnterior dq 0d
 tope1 db '$'
-valorErrorAbsolutoIteracion dd ?
+copiaValorIteracionAnterior dq 0d
+tope15 db '$'
+valorErrorAbsolutoIteracion dq ?
 tope12 db '$'
-valorErrorAbsolutoAceptable dd ?
+valorErrorAbsolutoAceptable dq ?
 tope7 db '$'
-valorDecimalCualquiera dd ?
+valorDecimalCualquiera dq ?
 tope6 db '$'
 variableValorDos dw 2d
 tope10 db '$'
-; Variables para ver lo del resultado en decimal
-;variables para imprimir decimales
-puntoDecimal db 46d, '$'
-signoDecimal db 43d, '$'
-banderaFPU dw ?, '$'
-variableCero dw ?, '$'
-parteDecimal dw ?, '$'
-extraerDecimal dw 1000d, '$'
-variableValorUno dw 1, '$'
-numeroCualquiera dw 8, '$'
-otroCualquiera dw 3, '$'
-parteEntera dw ?
-variable dw ?
+
 
 ; Variables para graficar o dibujar (como se le quiera decir)
 valorY       dw ? ; Variable para almacenar el valor de la coordenada Y.
@@ -795,8 +799,17 @@ inicio:
         lTerminarNewton:
         ; Imprimir resultado
         mImprimirCadena elCeroEncontradoEs
-        
-        FLD valorErrorAbsolutoIteracion
+        FINIT
+        FLD valorIteracionAnterior
+        call pImprimirNumeroDecimal
+        FINIT
+        FLD valorIteracionAnterior
+        call pImprimirNumeroDecimal
+        FINIT
+        FLD valorIteracionAnterior
+        call pImprimirNumeroDecimal
+        FINIT
+        FLD valorIteracionAnterior
         call pImprimirNumeroDecimal
         ; mImprimirCadena conUnErrorDe
         ; FINIT
@@ -817,6 +830,8 @@ pImprimirNumeroDecimal proc
 ; Receives: variable en el FPU ( solo ella tiene que estar)
 ; Returns: numero decimal impreso
 ;---------------------------------------------------------
+    mReiniciarVariableFPU parteEntera
+    mReiniciarVariableFPU parteDecimal
     
     mov si, offset signoDecimal
     mov byte ptr[si], 43d
@@ -871,6 +886,7 @@ pImprimirNumeroDecimal proc
     mov si, offset parteDecimal
     mDoubleToString salidaNumeros, si
     mImprimirCadena salidaNumeros
+
     ret
 pImprimirNumeroDecimal endp
 
